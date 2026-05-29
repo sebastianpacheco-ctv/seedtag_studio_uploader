@@ -23,7 +23,6 @@ from studio_api import (  # noqa: E402
     StudioAPIClient,
     StudioVideoNotReadyError,
     StudioJWTExpiredError,
-    StudioAPIError,
 )
 
 # Import our custom database and Jira client layers
@@ -392,22 +391,48 @@ def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str
                 )
                 break
 
-            except (requests.exceptions.RequestException, StudioAPIError, Exception) as e:
+            except requests.exceptions.RequestException as e:
+                # Solo los fallos de red son transitorios y seguros de reintentar.
                 if attempt < max_attempts:
                     base_delay = 2.0
                     delay = base_delay * (2 ** (attempt - 1)) + random.uniform(0.5, 1.5)
                     database.update_job_item(
                         job_id, filename, status=status_text,
-                        msg=f"Error temporal: {str(e)}. Reintentando en {delay:.1f}s..."
+                        msg=f"Error de red. Reintentando en {delay:.1f}s..."
                     )
                     time.sleep(delay)
                 else:
+                    print(f"[job {job_id}] {filename}: red agotó reintentos: {e}")
                     database.update_job_item(
                         job_id, filename, status="error",
-                        msg=str(e)
+                        msg="Error de red al subir a Studio tras varios intentos."
                     )
 
+            except Exception as e:
+                # process_video_to_creative NO es idempotente (sube + crea creative):
+                # reintentar un error no-transitorio podría duplicar creatives en Studio.
+                # Registrar el detalle server-side y cortar con un mensaje genérico (A6/A2).
+                print(f"[job {job_id}] {filename}: error no recuperable: {e!r}")
+                database.update_job_item(
+                    job_id, filename, status="error",
+                    msg="Error al procesar el video en Studio."
+                )
+                break
+
         if jwt_expired:
+            # Marcar los items aún en cola como error y limpiar sus temp files (A4).
+            current = database.get_job(job_id)
+            if current:
+                for pending in current["items"]:
+                    if pending["status"] == "queued":
+                        database.update_job_item(
+                            job_id, pending["filename"], status="error",
+                            msg="No procesado: el JWT de Studio expiró durante el lote."
+                        )
+                        try:
+                            Path(pending["path"]).unlink(missing_ok=True)
+                        except OSError:
+                            pass
             break
 
         # Limpiar archivo temporal local una vez subido/fallado
