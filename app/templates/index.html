@@ -1990,7 +1990,14 @@
   // Start the Batch Upload processing
   async function startBatchUpload() {
     if (chosenFiles.length === 0) return;
-    
+
+    // Volcar cualquier tag tipeado pero NO agregado como chip (Enter/coma) antes de subir.
+    const tagInputEl = document.getElementById('tag-input');
+    if (tagInputEl && tagInputEl.value.trim()) {
+      addManualTag(tagInputEl.value);
+      tagInputEl.value = '';
+    }
+
     const fd = new FormData();
     fd.append('ticket_link', ticketInput.value);
     fd.append('country', document.getElementById('country-select').value);

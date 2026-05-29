@@ -567,8 +567,8 @@ class StudioAPIClient:
         filename ya formateado, si tenia minusculas el servidor rechazaba.
 
         Si Studio responde "The name already exists" (re-proceso de un ticket
-        cuyo video ya esta subido), reintentamos UNA vez con un sufijo de
-        fecha-hora (_RYYYYMMDDHHMM) para crear un nombre unico. Asi el
+        cuyo video ya esta subido), reintentamos con un sufijo de version
+        incremental (_V1, _V2, ...) hasta encontrar un nombre libre. Asi el
         re-proceso no choca con el video viejo (que no podemos borrar).
         """
         if not file_path.exists():
@@ -576,13 +576,10 @@ class StudioAPIClient:
         size_mb = file_path.stat().st_size / 1024 / 1024
         base_name = self._sanitize_video_filename(filename or file_path.name)
 
-        for attempt in range(2):
-            send_name = base_name
-            if attempt == 1:
-                # Reintento: sufijo de fecha-hora para nombre unico
-                from datetime import datetime as _dt
-                suffix = _dt.now().strftime("_R%Y%m%d%H%M")
-                send_name = self._sanitize_video_filename(base_name + suffix)
+        max_versions = 50  # tope de seguridad para no loopear indefinidamente
+        for attempt in range(max_versions):
+            # attempt 0 = nombre base; luego _V1, _V2, ... ante colisiones.
+            send_name = base_name if attempt == 0 else self._sanitize_video_filename(f"{base_name}_V{attempt}")
             log.info(f"Studio API: subiendo {file_path.name} como '{send_name}' "
                      f"({size_mb:.1f} MB) con pipeline='{video_pipeline_id}'")
             variables = {
@@ -599,8 +596,8 @@ class StudioAPIClient:
                     multipart_filename=send_name,
                 )
             except StudioAPIError as e:
-                if "name already exists" in str(e).lower() and attempt == 0:
-                    log.warning(f"Studio API: '{send_name}' ya existe — reintento con sufijo de fecha")
+                if "name already exists" in str(e).lower() and attempt < max_versions - 1:
+                    log.warning(f"Studio API: '{send_name}' ya existe — reintento como _V{attempt + 1}")
                     continue
                 raise
             video = data["uploadVideo"]
