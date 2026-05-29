@@ -1,0 +1,21 @@
+.git
+.gitignore
+venv/
+.env
+.env.example
+tmp/
+*.db
+*.log
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.idea/
+.vscode/
+.gemini/
+CLAUDE.md
+KICKOFF.md
+README.md
+Seedtag brand.md
+Logos/

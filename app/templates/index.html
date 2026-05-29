@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Studio Batch Uploader — Seedtag</title>
+  
+  <!-- Seedtag Mandatory Google Fonts Import -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Official Seedtag Branding CSS Variables */
+    :root {
+      --coral: #FF6B7C;
+      --black: #000000;
+      --white: #FFFFFF;
+      --cream: #EBE6E4;
+      --grey-1: #D4D0CE;
+      --grey-2: #BCB8B6;
+      --grey-3: #8D8A89;
+      --grey-4: #5E5C5B;
+      --grey-5: #2F2E2E;
+      
+      --font-sans: 'Instrument Sans', sans-serif;
+      --font-serif: 'Instrument Serif', serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--black);
+      color: var(--white);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      padding: 40px 20px;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* Seedtag Signature Overlapping Lens Elements */
+    .lens-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .lens {
+      border-radius: 50%;
+      position: absolute;
+    }
+
+    .lens-coral-glow {
+      background: radial-gradient(circle, rgba(255,107,124,0.12) 0%, rgba(255,107,124,0) 70%);
+      width: 600px;
+      height: 600px;
+      top: -200px;
+      left: -200px;
+    }
+
+    .lens-white-glow {
+      background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 70%);
+      width: 450px;
+      height: 450px;
+      bottom: -150px;
+      right: -100px;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--black);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--grey-4);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--grey-3);
+    }
+
+    .container {
+      max-width: 880px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header styling */
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 40px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    @media (min-width: 600px) {
+      header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+
+    .brand-logo {
+      height: 20px;
+      margin-bottom: 12px;
+      display: block;
+      opacity: 0.95;
+    }
+
+    .logo-section h1 {
+      font-family: var(--font-sans);
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    /* Headline Accent Font: Instrument Serif Italic */
+    .serif-title {
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--coral);
+      margin-left: 2px;
+    }
+
+    .logo-subtitle {
+      color: var(--grey-3);
+      font-size: 0.95rem;
+      margin-top: 6px;
+      font-weight: 400;
+    }
+
+    /* SSO User Pill */
+    .user-pill {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--grey-4);
+      padding: 8px 16px;
+      border-radius: 50px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      align-self: flex-start;
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--coral);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: var(--white);
+      font-size: 0.8rem;
+    }
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .user-email {
+      font-size: 0.75rem;
+      color: var(--grey-3);
+    }
+
+    .sso-btn {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--white);
+      border: 1px solid var(--grey-4);
+      padding: 8px 18px;
+      border-radius: 50px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: background 0.2s ease, border-color 0.2s ease;
+      align-self: flex-start;
+    }
+
+    .sso-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--grey-3);
+    }
+
+    .sso-btn img {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Grid Layout */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    /* Card Panels using Grey-5 near-black for backgrounds */
+    .card {
+      background: rgba(47, 46, 46, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 28px;
+      backdrop-filter: blur(12px);
+      transition: border-color 0.3s ease;
+      position: relative;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .card-title {
+      font-family: var(--font-sans);
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      letter-spacing: -0.01em;
+    }
+
+    .card-title svg {
+      width: 20px;
+      height: 20px;
+      color: var(--coral);
+    }
+
+    /* Form controls */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group.last {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--grey-2);
+      margin-bottom: 8px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    input[type=text], select {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--grey-4);
+      background: rgba(0, 0, 0, 0.7);
+      color: var(--white);
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      outline: none;
+    }
+
+    input[type=text]:focus, select:focus {
+      border-color: var(--coral);
+    }
+
+    input[type=text]::placeholder {
+      color: var(--grey-3);
+    }
+
+    select {
+      appearance: none;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238D8A89'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      background-size: 14px;
+      padding-right: 40px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    @media (min-width: 600px) {
+      .form-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* Auth Card Validation Info */
+    .auth-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-top: 14px;
+    }
+
+    .badge-disconnected {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .badge-connected {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    /* Auto-detect badge styling */
+    .detection-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.08);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: 8px;
+      padding: 6px 12px;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .detection-badge.loading {
+      background: rgba(245, 158, 11, 0.08);
+      color: #f59e0b;
+      border-color: rgba(245, 158, 11, 0.2);
+    }
+
+    /* Drag & Drop Area */
+    .drop-zone {
+      border: 2px dashed var(--grey-4);
+      border-radius: 12px;
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease;
+      background: rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .drop-zone:hover, .drop-zone.over {
+      border-color: var(--coral);
+      background: rgba(255, 107, 124, 0.02);
+    }
+
+    .drop-icon {
+      font-size: 2rem;
+      color: var(--coral);
+    }
+
+    .drop-text {
+      font-weight: 500;
+      font-size: 0.95rem;
+      color: var(--white);
+    }
+
+    .drop-subtext {
+      color: var(--grey-3);
+      font-size: 0.8rem;
+    }
+
+    /* Upload Button - Coral Accent */
+    button.btn-primary {
+      background: var(--coral);
+      color: var(--white);
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 0.95rem;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    button.btn-primary:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    button.btn-primary:disabled {
+      background: var(--grey-5);
+      color: var(--grey-2);
+      cursor: not-allowed;
+      border: 1px solid var(--grey-4);
+    }
+
+    /* Small Secondary Button */
+    button.btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--white);
+      border: 1px solid var(--grey-4);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: background 0.2s ease;
+    }
+
+    button.btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Chosen File List */
+    .file-list {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .file-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    .file-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+
+    .file-size {
+      color: var(--grey-3);
+      font-size: 0.8rem;
+    }
+
+    /* Active Progress Dashboard */
+    .active-job-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 12px;
+    }
+
+    .job-title-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-sans);
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .job-badge {
+      background: rgba(255, 107, 124, 0.1);
+      color: var(--coral);
+      padding: 2px 10px;
+      border-radius: 50px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .progress-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .progress-item-card {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .progress-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .item-file-name {
+      font-weight: 500;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 60%;
+    }
+
+    /* Progress States / Badges */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 50px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .status-queued { background: rgba(255, 255, 255, 0.05); color: var(--grey-2); }
+    .status-uploading { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+    .status-processing { background: rgba(255, 107, 124, 0.15); color: var(--coral); }
+    .status-done { background: rgba(16, 185, 129, 0.15); color: #10B981; }
+    .status-error { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+    .item-error-msg {
+      font-size: 0.8rem;
+      color: var(--coral);
+      background: rgba(255, 107, 124, 0.05);
+      border-left: 3px solid var(--coral);
+      padding: 6px 12px;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+
+    .preview-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #10B981;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+
+    .preview-link-btn:hover {
+      opacity: 0.8;
+      text-decoration: underline;
+    }
+
+    /* History / Past Uploads Section */
+    .history-table-wrapper {
+      overflow-x: auto;
+      margin-top: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      padding: 12px 16px;
+      font-size: 0.75rem;
+      color: var(--grey-3);
+      text-transform: uppercase;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 0.9rem;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .history-ticket {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      color: var(--coral);
+    }
+
+    .history-done {
+      color: #10B981;
+      font-weight: 600;
+    }
+
+    .history-failed {
+      color: #ef4444;
+      font-weight: 600;
+    }
+
+    .history-date {
+      color: var(--grey-3);
+      font-size: 0.8rem;
+    }
+
+    /* Brand Footer Wordmark placing */
+    footer {
+      margin-top: 60px;
+      padding: 24px 0;
+      text-align: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .wordmark {
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      color: var(--white);
+      opacity: 0.5;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Overlapping Lens Elements Background -->
+<div class="lens-container">
+  <div class="lens lens-coral-glow"></div>
+  <div class="lens lens-white-glow"></div>
+</div>
+
+<div class="container">
+  <!-- Header -->
+  <header>
+    <div class="logo-section">
+      <img src="/static/logos/Seedtag Wordmark - White (RGB).svg" alt="Seedtag Logo" class="brand-logo">
+      <h1>Sube videos en lote a Studio <span class="serif-title">al instante</span></h1>
+      <div class="logo-subtitle">Conecta tus CTV creatives con tickets de Jira en un solo paso.</div>
+    </div>
+    
+    <!-- User SSO Status Panel -->
+    <div id="auth-panel">
+      <button class="sso-btn" onclick="loginSSO()">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google Logo">
+        Google SSO
+      </button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- Panel 1: Autenticación de Studio -->
+    <section class="card" id="studio-auth-card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+        </svg>
+        Vincular cuenta de Studio
+      </div>
+      <div class="form-group last">
+        <label>JWT Token de Studio (cookie <code>seedtag_jwt</code>)</label>
+        <div class="input-wrapper" style="display: flex; gap: 10px;">
+          <input type="text" id="jwt-token" placeholder="Pegá el JWT de tu cookie seedtag_jwt (ej: eyJ...)" style="flex: 1;">
+          <button class="btn-secondary" onclick="saveJwt()" style="min-width: 120px;">Vincular</button>
+        </div>
+        <div id="studio-status" class="auth-status-badge badge-disconnected">
+          🔴 Cuenta desconectada
+        </div>
+        <p class="drop-subtext" style="margin-top: 8px;">
+          ¿Cómo obtenerlo? Entra a <a href="https://studio.seedtag.com" target="_blank" style="color: var(--coral); text-decoration: underline;">Studio Seedtag</a>, abre DevTools (F12) → Aplicación / Cookies → Busca la clave <code>seedtag_jwt</code> y copia su valor.
+        </p>
+      </div>
+    </section>
+
+    <!-- Panel 2: Formulario Batch Uploader -->
+    <section class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+        Subir videos en lote
+      </div>
+      
+      <div class="form-group">
+        <label for="ticket-link">Enlace de Jira Ticket (SDS-XXXX)</label>
+        <input type="text" id="ticket-link" placeholder="https://seedtag.atlassian.net/browse/SDS-1234" oninput="handleTicketInput()">
+        <div id="jira-detector-status"></div>
+      </div>
+
+      <!-- Country / Category Selectors -->
+      <div class="form-row form-group">
+        <div>
+          <label for="country-select">País (Country)</label>
+          <select id="country-select">
+            <option value="auto" selected>✨ Auto-detectar desde Jira</option>
+            <option value="usa">Estados Unidos (USA)</option>
+            <option value="canada">Canadá (CA)</option>
+            <option value="mexico">México (MX)</option>
+            <option value="brazil">Brasil (BR)</option>
+            <option value="spain">España (ES)</option>
+            <option value="france">Francia (FR)</option>
+            <option value="germany">Alemania (DE)</option>
+            <option value="italy">Italia (IT)</option>
+            <option value="uk">Reino Unido (UK)</option>
+            <option value="netherlands">Países Bajos (NL)</option>
+            <option value="mena">MENA</option>
+            <option value="international">Internacional (ROLA/EMEA/EU)</option>
+          </select>
+        </div>
+        <div>
+          <label for="category-select">Categoría (Industry)</label>
+          <select id="category-select">
+            <option value="auto" selected>✨ Auto-detectar desde Jira</option>
+            <option value="automotive">Automotriz (Automotive)</option>
+            <option value="beauty">Belleza (Beauty)</option>
+            <option value="industry">Industria & Logística (Business, Industry)</option>
+            <option value="entertainment">Entretenimiento & Cultura (Entertainment)</option>
+            <option value="fashion">Moda (Fashion)</option>
+            <option value="food-and-drinks">Alimentos & Bebidas (Food and Drinks)</option>
+            <option value="health">Salud (Health)</option>
+            <option value="home">Hogar (Home)</option>
+            <option value="charity">ONGs & Servicios Públicos (Non-profits)</option>
+            <option value="pets">Mascotas (Pets)</option>
+            <option value="retail">Comercio (Retail)</option>
+            <option value="technology">Tecnología (Technology)</option>
+            <option value="travel">Viajes & Transporte (Travel)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Drag & Drop Area -->
+      <div class="form-group">
+        <label>Videos seleccionados</label>
+        <div class="drop-zone" id="drop-zone">
+          <span class="drop-icon">🎬</span>
+          <span class="drop-text">Arrastra tus videos aquí o haz click para explorar</span>
+          <span class="drop-subtext">Formatos admitidos: MP4, MOV, WebM.</span>
+        </div>
+        <input type="file" id="file-input" multiple accept="video/*" hidden>
+        
+        <!-- Files list queued -->
+        <div class="file-list" id="file-list"></div>
+      </div>
+
+      <button class="btn-primary" id="upload-btn" onclick="startBatchUpload()" disabled>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 18px; height: 18px;">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+        Subir lote a Studio
+      </button>
+    </section>
+
+    <!-- Panel 3: Resultados de Cola Activa -->
+    <section class="card" id="results-panel" hidden>
+      <div class="active-job-header">
+        <div class="job-title-info">
+          <span>Estado de la cola</span>
+          <span class="job-badge" id="job-active-ticket">SDS-XXXX</span>
+        </div>
+        <span class="drop-subtext" id="job-progress-ratio">0/0 completados</span>
+      </div>
+      
+      <div class="progress-cards" id="progress-container">
+        <!-- Will be populated dynamically via JavaScript -->
+      </div>
+    </section>
+
+    <!-- Panel 4: Historial de Subidas -->
+    <section class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Historial de subidas
+      </div>
+      <div class="history-table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticket</th>
+              <th>Fecha y Hora</th>
+              <th>Usuario</th>
+              <th>Videos</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="history-rows">
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--grey-3); padding: 20px;">
+                Cargando historial...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  
+  <!-- Seedtag Wordmark in footer placement -->
+  <footer>
+    <div class="wordmark">SEEDTAG</div>
+  </footer>
+</div>
+
+<script>
+  let chosenFiles = [];
+  let isStudioConnected = false;
+  let activePollInterval = null;
+  let ticketDebounceTimeout = null;
+
+  // Initialize Elements
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const fileListElement = document.getElementById('file-list');
+  const uploadBtn = document.getElementById('upload-btn');
+  const ticketInput = document.getElementById('ticket-link');
+
+  // Trigger file browsing
+  dropZone.onclick = () => fileInput.click();
+
+  // Drag & drop handlers
+  ['dragover', 'dragleave', 'drop'].forEach(e => dropZone.addEventListener(e, ev => ev.preventDefault()));
+  dropZone.addEventListener('dragover', () => dropZone.classList.add('over'));
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+  dropZone.addEventListener('drop', ev => {
+    dropZone.classList.remove('over');
+    chosenFiles = [...ev.dataTransfer.files].filter(f => f.type.startsWith('video/'));
+    updateFileList();
+  });
+
+  fileInput.addEventListener('change', () => {
+    chosenFiles = [...fileInput.files];
+    updateFileList();
+  });
+
+  // Load Auth Status & History on initialization
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchAuthStatus();
+    loadHistory();
+  });
+
+  // Format bytes
+  function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  // Update file queue lists
+  function updateFileList() {
+    fileListElement.innerHTML = '';
+    chosenFiles.forEach((file, index) => {
+      const fileItem = document.createElement('div');
+      fileItem.className = 'file-item';
+      fileItem.innerHTML = `
+        <div class="file-name">
+          <span>🎬</span>
+          <span>${file.name}</span>
+        </div>
+        <div class="file-size">${formatBytes(file.size)}</div>
+      `;
+      fileListElement.appendChild(fileItem);
+    });
+    checkFormValidity();
+  }
+
+  // Handle forms validity to enable/disable main Upload button
+  function checkFormValidity() {
+    const ticketVal = ticketInput.value.trim();
+    const hasTicket = /\b([A-Z][A-Z0-9]+)-(\d+)\b/.test(ticketVal);
+    const hasFiles = chosenFiles.length > 0;
+    
+    uploadBtn.disabled = !(hasTicket && hasFiles && isStudioConnected);
+  }
+
+  // Google SSO simulated login
+  async function loginSSO() {
+    const r = await fetch('/api/login', { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) {
+      fetchAuthStatus();
+    }
+  }
+
+  // Google SSO simulated logout
+  async function logoutSSO() {
+    const r = await fetch('/api/logout', { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) {
+      isStudioConnected = false;
+      document.getElementById('jwt-token').value = '';
+      fetchAuthStatus();
+    }
+  }
+
+  // Fetch current SSO & JWT Status
+  async function fetchAuthStatus() {
+    const r = await fetch('/api/auth-status');
+    const j = await r.json();
+    const authPanel = document.getElementById('auth-panel');
+    const studioStatusBadge = document.getElementById('studio-status');
+
+    // SSO login interface updates
+    if (j.sso_user) {
+      authPanel.innerHTML = `
+        <div class="user-pill">
+          <div class="user-avatar">${j.sso_name[0]}</div>
+          <div class="user-info">
+            <span class="user-name">${j.sso_name}</span>
+            <span class="user-email">${j.sso_user}</span>
+          </div>
+          <button class="btn-secondary" onclick="logoutSSO()" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 20px; margin-left: 8px;">Salir</button>
+        </div>
+      `;
+    } else {
+      authPanel.innerHTML = `
+        <button class="sso-btn" onclick="loginSSO()">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google Logo">
+          Google SSO
+        </button>
+      `;
+    }
+
+    // Studio JWT connection status updates
+    if (j.has_jwt && j.studio_user) {
+      isStudioConnected = true;
+      studioStatusBadge.className = 'auth-status-badge badge-connected';
+      studioStatusBadge.innerHTML = `🟢 Conectado: ${j.studio_name} (${j.studio_user})`;
+    } else {
+      isStudioConnected = false;
+      studioStatusBadge.className = 'auth-status-badge badge-disconnected';
+      studioStatusBadge.innerHTML = `🔴 Cuenta desconectada`;
+    }
+    checkFormValidity();
+  }
+
+  // Save and verify JWT Studio
+  async function saveJwt() {
+    const jwt = document.getElementById('jwt-token').value.trim();
+    if (!jwt) {
+      alert("Introduce un token JWT válido");
+      return;
+    }
+    
+    const studioStatusBadge = document.getElementById('studio-status');
+    studioStatusBadge.className = 'auth-status-badge badge-disconnected';
+    studioStatusBadge.innerHTML = `⏳ Verificando credencial...`;
+
+    try {
+      const r = await fetch('/api/set-jwt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jwt })
+      });
+      const j = await r.json();
+      
+      if (j.ok) {
+        alert(`¡Conexión exitosa a Studio!\nUsuario: ${j.name}`);
+        fetchAuthStatus();
+      } else {
+        alert(`Error al verificar JWT: ${j.error}`);
+        fetchAuthStatus();
+      }
+    } catch (err) {
+      alert("Error de red al conectar al backend");
+      fetchAuthStatus();
+    }
+  }
+
+  // Real-time listener for Jira automatic detection
+  function handleTicketInput() {
+    clearTimeout(ticketDebounceTimeout);
+    checkFormValidity();
+    
+    const ticketVal = ticketInput.value.trim();
+    const match = ticketVal.match(/\b([A-Z][A-Z0-9]+)-(\d+)\b/);
+    const badgeContainer = document.getElementById('jira-detector-status');
+    
+    if (!match) {
+      badgeContainer.innerHTML = '';
+      return;
+    }
+
+    const key = match[0];
+    badgeContainer.innerHTML = `<div class="detection-badge loading">⏳ Detectando campos del ticket ${key}...</div>`;
+
+    ticketDebounceTimeout = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/jira-detect/${key}`);
+        const j = await r.json();
+        
+        if (j.ok) {
+          let badgeText = '';
+          if (j.country || j.category) {
+            badgeText = `✨ Detectado en Jira: `;
+            if (j.country) badgeText += `🌍 ${j.country} `;
+            if (j.category) badgeText += `🏷️ ${j.category}`;
+            
+            // Set selectors to auto by default
+            document.getElementById('country-select').value = 'auto';
+            document.getElementById('category-select').value = 'auto';
+          } else {
+            badgeText = `⚠️ Sin campos configurados en Jira. Se aplicarán valores por defecto.`;
+          }
+          badgeContainer.innerHTML = `<div class="detection-badge">${badgeText}</div>`;
+        } else {
+          badgeContainer.innerHTML = `<div class="detection-badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239,68,68,0.2)">⚠️ Jira no disponible o ticket inaccesible. Ingresa país/categoría manualmente.</div>`;
+        }
+      } catch (err) {
+        badgeContainer.innerHTML = '';
+      }
+    }, 800); // 800ms debounce
+  }
+
+  // Start the Batch Upload processing
+  async function startBatchUpload() {
+    if (chosenFiles.length === 0) return;
+    
+    const fd = new FormData();
+    fd.append('ticket_link', ticketInput.value);
+    fd.append('country', document.getElementById('country-select').value);
+    fd.append('category', document.getElementById('category-select').value);
+    chosenFiles.forEach(file => {
+      fd.append('videos', file);
+    });
+
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = `⏳ Iniciando lote...`;
+
+    try {
+      const r = await fetch('/api/upload', {
+        method: 'POST',
+        body: fd
+      });
+      const j = await r.json();
+      
+      uploadBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 18px; height: 18px;">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg> Subir lote a Studio
+      `;
+      uploadBtn.disabled = false;
+
+      if (j.ok) {
+        // Show results active progress panel
+        document.getElementById('results-panel').hidden = false;
+        document.getElementById('job-active-ticket').innerText = j.ticket;
+        document.getElementById('job-progress-ratio').innerText = `0/${j.count} completados`;
+        
+        // Scroll to results panel
+        document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth' });
+        
+        // Clear files list
+        chosenFiles = [];
+        document.getElementById('file-input').value = '';
+        updateFileList();
+        
+        // Start polling the job in background
+        pollActiveJob(j.job_id);
+      } else {
+        alert("Error al iniciar el lote: " + j.error);
+      }
+    } catch (err) {
+      alert("Error de red");
+      uploadBtn.disabled = false;
+    }
+  }
+
+  // Poll active background job
+  function pollActiveJob(jobId) {
+    if (activePollInterval) clearInterval(activePollInterval);
+    
+    activePollInterval = setInterval(async () => {
+      const r = await fetch(`/api/job/${jobId}`);
+      const j = await r.json();
+      
+      if (!j.ok) {
+        clearInterval(activePollInterval);
+        return;
+      }
+
+      const container = document.getElementById('progress-container');
+      container.innerHTML = '';
+
+      let doneCount = 0;
+      j.items.forEach(it => {
+        const isCompletedState = (it.status === 'done' || it.status === 'error' || it.status === 'processing');
+        if (isCompletedState && it.status !== 'processing') doneCount++;
+        if (it.status === 'processing') doneCount++; // Wait counts as processed in loop checks
+
+        const card = document.createElement('div');
+        card.className = 'progress-item-card';
+
+        let statusText = it.status;
+        let actionColumn = '';
+
+        if (it.status === 'done') {
+          statusText = 'Listo';
+          actionColumn = `<a href="${it.url}" target="_blank" class="preview-link-btn">🔗 Ver vista previa</a>`;
+        } else if (it.status === 'error') {
+          statusText = 'Error';
+          actionColumn = `<div class="item-error-msg">${it.msg || 'Error en procesamiento'}</div>`;
+        } else if (it.status === 'uploading') {
+          statusText = 'Subiendo...';
+        } else if (it.status === 'processing') {
+          statusText = 'Procesando en Studio...';
+          actionColumn = `<div class="drop-subtext" style="color: var(--coral); margin-top: 4px;">El video fue subido y está siendo procesado por Studio (CTV ~30-60s).</div>`;
+        } else {
+          statusText = 'En cola';
+        }
+
+        card.innerHTML = `
+          <div class="progress-item-top">
+            <span class="item-file-name" title="${it.filename}">🎬 ${it.filename}</span>
+            <span class="status-pill status-${it.status}">${statusText}</span>
+          </div>
+          ${actionColumn}
+        `;
+        container.appendChild(card);
+      });
+
+      document.getElementById('job-progress-ratio').innerText = `${doneCount}/${j.items.length} completados`;
+
+      if (j.done) {
+        clearInterval(activePollInterval);
+        loadHistory(); // Reload history
+      }
+    }, 2000); // Poll every 2 seconds
+  }
+
+  // Poll history uploads
+  async function loadHistory() {
+    try {
+      const r = await fetch('/api/history');
+      const j = await r.json();
+      
+      const tbody = document.getElementById('history-rows');
+      if (j.history.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" style="text-align: center; color: var(--grey-3); padding: 30px;">
+              No hay subidas recientes en el historial. ¡Arrastra algunos videos para iniciar!
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = j.history.map(job => {
+        const date = new Date(job.created_at).toLocaleString();
+        
+        let statusBadge = '';
+        if (job.status === 'done') {
+          statusBadge = `<span class="history-done">Completado</span>`;
+        } else if (job.status === 'running') {
+          statusBadge = `<span class="status-pill status-uploading" style="font-size: 0.75rem; padding: 2px 8px;">Ejecutando</span>`;
+        } else {
+          statusBadge = `<span class="history-failed">Con errores</span>`;
+        }
+
+        return `
+          <tr>
+            <td class="history-ticket">${job.ticket_key}</td>
+            <td class="history-date">${date}</td>
+            <td>${job.user_email}</td>
+            <td style="font-weight: 500;">${job.success_items} / ${job.total_items} ok</td>
+            <td>${statusBadge}</td>
+          </tr>
+        `;
+      }).join('');
+    } catch (err) {
+      console.error("Error al cargar historial", err);
+    }
+  }
+</script>
+</body>
+</html>
