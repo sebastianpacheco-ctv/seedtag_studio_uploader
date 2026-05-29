@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "reference"))
 
-from app import ticket_key_from_link
+from app import safe_upload_filename, ticket_key_from_link
 from studio_api import StudioAPIClient
 
 
@@ -84,6 +84,24 @@ class TestBatchUploaderHelpers(unittest.TestCase):
         self.assertIsNone(StudioAPIClient.map_category("unknown_industry"))
         self.assertIsNone(StudioAPIClient.map_category(None))
         self.assertIsNone(StudioAPIClient.map_category(""))
+
+    def test_safe_upload_filename(self):
+        """Verifies that uploaded filenames stay local, safe, and unique."""
+        used_names = set()
+
+        self.assertEqual(
+            safe_upload_filename("../../evil clip.mp4", used_names),
+            "evil_clip.mp4"
+        )
+        self.assertEqual(
+            safe_upload_filename("client spot.mp4", used_names),
+            "client_spot.mp4"
+        )
+        self.assertEqual(
+            safe_upload_filename("client spot.mp4", used_names),
+            "client_spot_2.mp4"
+        )
+        self.assertEqual(safe_upload_filename("", used_names), "video")
 
 
 if __name__ == "__main__":

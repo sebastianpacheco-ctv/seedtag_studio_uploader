@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from flask import Flask, request, jsonify, render_template, session, Response
+from werkzeug.utils import secure_filename
 
 # Add reference/ directory to python path to import the real Studio client.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "reference"))
@@ -54,6 +55,24 @@ def ticket_key_from_link(link: str) -> str | None:
 def get_user_studio_jwt() -> str | None:
     """JWT de Studio del usuario actual. De la sesión o del env (para desarrollo)."""
     return session.get("studio_jwt") or os.getenv("STUDIO_JWT_COOKIE")
+
+
+def safe_upload_filename(filename: str, existing_names: set[str] | None = None) -> str:
+    """Return a safe, unique filename for storing an uploaded video in a job dir."""
+    existing_names = existing_names if existing_names is not None else set()
+    safe_name = secure_filename(filename or "") or "video"
+    path = Path(safe_name)
+    stem = path.stem or "video"
+    suffix = path.suffix
+
+    candidate = safe_name
+    counter = 2
+    while candidate in existing_names:
+        candidate = f"{stem}_{counter}{suffix}"
+        counter += 1
+
+    existing_names.add(candidate)
+    return candidate
 
 
 # ── Rutas ──────────────────────────────────────────────────────────────────--
@@ -171,11 +190,13 @@ def upload():
     # Crear el Job en la Base de Datos SQLite
     database.create_job(job_id, ticket_key, user_email, status="running")
 
-    # Guardar cada archivo y agregarlo a job_items
+    # Guardar cada archivo y agregarlo a job_items con nombres seguros y únicos.
+    used_filenames = set()
     for f in files:
-        dest = job_dir / f.filename
+        filename = safe_upload_filename(f.filename, used_filenames)
+        dest = job_dir / filename
         f.save(str(dest))
-        database.add_job_item(job_id, f.filename, str(dest), status="queued")
+        database.add_job_item(job_id, filename, str(dest), status="queued")
 
     # Arrancar hilo worker en background
     t = threading.Thread(

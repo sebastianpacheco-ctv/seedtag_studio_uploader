@@ -1085,16 +1085,34 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    })[char]);
+  }
+
+  function statusKind(status) {
+    const raw = String(status || '').toLowerCase();
+    if (raw.startsWith('uploading')) return 'uploading';
+    if (['queued', 'processing', 'done', 'error'].includes(raw)) return raw;
+    return 'queued';
+  }
+
   // Update file queue lists
   function updateFileList() {
     fileListElement.innerHTML = '';
     chosenFiles.forEach((file, index) => {
+      const safeName = escapeHtml(file.name);
       const fileItem = document.createElement('div');
       fileItem.className = 'file-item';
       fileItem.innerHTML = `
         <div class="file-name">
           <span>🎬</span>
-          <span>${file.name}</span>
+          <span title="${safeName}">${safeName}</span>
         </div>
         <div class="file-size">${formatBytes(file.size)}</div>
       `;
@@ -1106,7 +1124,7 @@
   // Handle forms validity to enable/disable main Upload button
   function checkFormValidity() {
     const ticketVal = ticketInput.value.trim();
-    const hasTicket = /\b([A-Z][A-Z0-9]+)-(\d+)\b/.test(ticketVal);
+    const hasTicket = /\bSDS-\d+\b/.test(ticketVal.toUpperCase());
     const hasFiles = chosenFiles.length > 0;
     
     uploadBtn.disabled = !(hasTicket && hasFiles && isStudioConnected);
@@ -1182,12 +1200,16 @@
 
     // SSO login interface updates
     if (j.sso_user) {
+      const displayName = j.sso_name || j.sso_user || 'Seedtag User';
+      const initial = escapeHtml(displayName.charAt(0).toUpperCase());
+      const safeName = escapeHtml(displayName);
+      const safeEmail = escapeHtml(j.sso_user);
       authPanel.innerHTML = `
         <div class="user-pill">
-          <div class="user-avatar">${j.sso_name[0]}</div>
+          <div class="user-avatar">${initial}</div>
           <div class="user-info">
-            <span class="user-name">${j.sso_name}</span>
-            <span class="user-email">${j.sso_user}</span>
+            <span class="user-name">${safeName}</span>
+            <span class="user-email">${safeEmail}</span>
           </div>
           <button class="btn-secondary" onclick="logoutSSO()" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 20px; margin-left: 8px;">Salir</button>
         </div>
@@ -1205,7 +1227,7 @@
     if (j.has_jwt && j.studio_user) {
       isStudioConnected = true;
       studioStatusBadge.className = 'auth-status-badge badge-connected';
-      studioStatusBadge.innerHTML = `🟢 Conectado: ${j.studio_name} (${j.studio_user})`;
+      studioStatusBadge.innerHTML = `🟢 Conectado: ${escapeHtml(j.studio_name || 'Studio')} (${escapeHtml(j.studio_user)})`;
     } else {
       isStudioConnected = false;
       studioStatusBadge.className = 'auth-status-badge badge-disconnected';
@@ -1261,8 +1283,8 @@
       return;
     }
 
-    const key = match[0];
-    badgeContainer.innerHTML = `<div class="detection-badge loading">⏳ Detectando campos del ticket ${key}...</div>`;
+    const key = match[0].toUpperCase();
+    badgeContainer.innerHTML = `<div class="detection-badge loading">⏳ Detectando campos del ticket ${escapeHtml(key)}...</div>`;
 
     ticketDebounceTimeout = setTimeout(async () => {
       try {
@@ -1273,8 +1295,8 @@
           let badgeText = '';
           if (j.country || j.category) {
             badgeText = `✨ Detectado en Jira: `;
-            if (j.country) badgeText += `🌍 ${j.country} `;
-            if (j.category) badgeText += `🏷️ ${j.category}`;
+            if (j.country) badgeText += `🌍 ${escapeHtml(j.country)} `;
+            if (j.category) badgeText += `🏷️ ${escapeHtml(j.category)}`;
             
             // Set selectors to auto by default
             document.getElementById('country-select').value = 'auto';
@@ -1368,35 +1390,37 @@
 
       let doneCount = 0;
       j.items.forEach(it => {
-        const isCompletedState = (it.status === 'done' || it.status === 'error' || it.status === 'processing');
-        if (isCompletedState && it.status !== 'processing') doneCount++;
-        if (it.status === 'processing') doneCount++; // Wait counts as processed in loop checks
+        const state = statusKind(it.status);
+        const isCompletedState = (state === 'done' || state === 'error' || state === 'processing');
+        if (isCompletedState && state !== 'processing') doneCount++;
+        if (state === 'processing') doneCount++; // Wait counts as processed in loop checks
 
         const card = document.createElement('div');
         card.className = 'progress-item-card';
 
-        let statusText = it.status;
+        let statusText = it.status || 'queued';
         let actionColumn = '';
 
-        if (it.status === 'done') {
+        if (state === 'done') {
           statusText = 'Listo';
-          actionColumn = `<a href="${it.url}" target="_blank" class="preview-link-btn">🔗 Ver vista previa</a>`;
-        } else if (it.status === 'error') {
+          actionColumn = `<a href="${escapeHtml(it.url || '#')}" target="_blank" class="preview-link-btn">🔗 Ver vista previa</a>`;
+        } else if (state === 'error') {
           statusText = 'Error';
-          actionColumn = `<div class="item-error-msg">${it.msg || 'Error en procesamiento'}</div>`;
-        } else if (it.status === 'uploading') {
+          actionColumn = `<div class="item-error-msg">${escapeHtml(it.msg || 'Error en procesamiento')}</div>`;
+        } else if (state === 'uploading') {
           statusText = 'Subiendo...';
-        } else if (it.status === 'processing') {
+        } else if (state === 'processing') {
           statusText = 'Procesando en Studio...';
           actionColumn = `<div class="drop-subtext" style="color: var(--coral); margin-top: 4px;">El video fue subido y está siendo procesado por Studio (CTV ~30-60s).</div>`;
         } else {
           statusText = 'En cola';
         }
 
+        const safeFilename = escapeHtml(it.filename || 'video');
         card.innerHTML = `
           <div class="progress-item-top">
-            <span class="item-file-name" title="${it.filename}">🎬 ${it.filename}</span>
-            <span class="status-pill status-${it.status}">${statusText}</span>
+            <span class="item-file-name" title="${safeFilename}">🎬 ${safeFilename}</span>
+            <span class="status-pill status-${state}">${escapeHtml(statusText)}</span>
           </div>
           ${actionColumn}
         `;
@@ -1424,7 +1448,7 @@
       const j = await r.json();
       
       const tbody = document.getElementById('history-rows');
-      if (j.history.length === 0) {
+      if (!j.ok || !Array.isArray(j.history) || j.history.length === 0) {
         tbody.innerHTML = `
           <tr>
             <td colspan="5" style="text-align: center; color: var(--grey-3); padding: 30px;">
@@ -1437,6 +1461,11 @@
 
       tbody.innerHTML = j.history.map(job => {
         const date = new Date(job.created_at).toLocaleString();
+        const safeTicket = escapeHtml(job.ticket_key);
+        const safeDate = escapeHtml(date);
+        const safeUser = escapeHtml(job.user_email);
+        const successItems = Number(job.success_items || 0);
+        const totalItems = Number(job.total_items || 0);
         
         let statusBadge = '';
         if (job.status === 'done') {
@@ -1449,10 +1478,10 @@
 
         return `
           <tr>
-            <td class="history-ticket">${job.ticket_key}</td>
-            <td class="history-date">${date}</td>
-            <td>${job.user_email}</td>
-            <td style="font-weight: 500;">${job.success_items} / ${job.total_items} ok</td>
+            <td class="history-ticket">${safeTicket}</td>
+            <td class="history-date">${safeDate}</td>
+            <td>${safeUser}</td>
+            <td style="font-weight: 500;">${successItems} / ${totalItems} ok</td>
             <td>${statusBadge}</td>
           </tr>
         `;
