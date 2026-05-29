@@ -30,7 +30,31 @@ import database
 from jira_client import JiraClient
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-only-secret-key-12345")
+
+# ¿Estamos en modo dev? Se usa para decidir defaults seguros vs. permisivos.
+IS_DEBUG = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+
+# Secret key: fail-closed en producción. Nunca un default público (C2).
+_secret = os.getenv("FLASK_SECRET_KEY")
+if not _secret:
+    if IS_DEBUG:
+        # Solo para desarrollo local; las sesiones no necesitan ser seguras acá.
+        _secret = "dev-only-insecure-key-do-not-use-in-prod"
+        print("WARNING: FLASK_SECRET_KEY no seteada — usando clave de DEV insegura.")
+    else:
+        raise RuntimeError(
+            "FLASK_SECRET_KEY es obligatoria en producción. "
+            "Generá una con `python -c \"import secrets; print(secrets.token_hex(32))\"`."
+        )
+app.secret_key = _secret
+
+# Endurecer la cookie de sesión (lleva el JWT de Studio server-side) (A1).
+# Secure por defecto; en dev local sobre http hay que setear SESSION_COOKIE_SECURE=False.
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "True").lower() == "true",
+)
 
 TMP = Path(os.getenv("TMP_DIR", "./tmp"))
 TMP.mkdir(parents=True, exist_ok=True)
@@ -60,8 +84,17 @@ def ticket_key_from_link(link: str) -> str | None:
 
 
 def get_user_studio_jwt() -> str | None:
-    """JWT de Studio del usuario actual. De la sesión o del env (para desarrollo)."""
-    return session.get("studio_jwt") or os.getenv("STUDIO_JWT_COOKIE")
+    """JWT de Studio del usuario actual, siempre desde su sesión (modelo por-usuario).
+
+    El fallback a la env STUDIO_JWT_COOKIE solo se permite si ALLOW_ENV_STUDIO_JWT=True
+    (desarrollo local); en producción compartir un JWT entre usuarios viola la regla
+    dura del proyecto (A8)."""
+    jwt = session.get("studio_jwt")
+    if jwt:
+        return jwt
+    if os.getenv("ALLOW_ENV_STUDIO_JWT", "False").lower() == "true":
+        return os.getenv("STUDIO_JWT_COOKIE")
+    return None
 
 
 def safe_upload_filename(filename: str, existing_names: set[str] | None = None) -> str:
