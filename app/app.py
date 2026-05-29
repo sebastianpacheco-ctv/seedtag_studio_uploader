@@ -11,9 +11,12 @@ import threading
 import json
 import time
 import random
+import logging
 import requests
 from functools import wraps
 from pathlib import Path
+
+log = logging.getLogger("studio_uploader")
 
 from flask import Flask, request, jsonify, render_template, session, Response, redirect, url_for
 from werkzeug.utils import secure_filename
@@ -209,17 +212,23 @@ def auth_callback():
     try:
         token = oauth.google.authorize_access_token()
     except Exception:
+        # Puede ser un fallo real de auth o una mala config; logear para diagnosticar (#5).
+        log.exception("OIDC: authorize_access_token falló")
         return redirect("/?auth_error=1")
 
     userinfo = token.get("userinfo") or {}
     email = (userinfo.get("email") or "").lower()
-    verified = userinfo.get("email_verified", False)
+    verified = userinfo.get("email_verified") is True  # estricto: no aceptar strings truthy (#3)
+    domain = ALLOWED_EMAIL_DOMAIN.lower()
+    hd = (userinfo.get("hd") or "").lower()
 
-    # Solo correos verificados del dominio permitido.
-    if not verified or not email.endswith("@" + ALLOWED_EMAIL_DOMAIN.lower()):
+    # Solo correos verificados del dominio permitido. Si viene el claim `hd`, debe coincidir.
+    if not verified or not email.endswith("@" + domain) or (hd and hd != domain):
         session.clear()
         return redirect("/?auth_error=domain")
 
+    # Rotar la sesión al autenticar para evitar session fixation (#2).
+    session.clear()
     session["user_email"] = email
     session["user_name"] = userinfo.get("name") or email
     return redirect("/")
@@ -233,6 +242,7 @@ def login():
         return jsonify({"ok": False, "error": "Usá el inicio de sesión con Google."}), 403
     if not IS_DEBUG:
         return jsonify({"ok": False, "error": "Login no disponible: configurá OIDC."}), 403
+    session.clear()  # rotar sesión al loguear (anti session fixation, #2)
     session["user_email"] = os.getenv("DEV_SSO_EMAIL", "sebastian.pacheco@seedtag.com")
     session["user_name"] = os.getenv("DEV_SSO_NAME", "Sebastian Pacheco")
     return jsonify({
@@ -357,12 +367,15 @@ def upload():
     if video_type not in ALLOWED_VIDEO_TYPES:
         video_type = "CSV-CTV"
 
-    # Tags manuales (metatags) del usuario: coma-separados. Normalizar y limitar.
+    # Tags manuales (metatags) del usuario: coma-separados. Normalizar y limitar
+    # (dedup case-insensitive, máx 64 chars por tag, máx 20 tags).
     raw_tags = request.form.get("tags", "")
     tags = []
+    seen_tags = set()
     for tg in raw_tags.split(","):
         tg = tg.strip()
-        if tg and tg not in tags:
+        if tg and len(tg) <= 64 and tg.lower() not in seen_tags:
+            seen_tags.add(tg.lower())
             tags.append(tg)
     tags = tags[:20]
 
@@ -480,10 +493,13 @@ def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str
     if not job:
         return
 
-    # 'ctv-express' es el tag de sistema; los tags manuales se agregan sin duplicar.
+    # 'ctv-express' es el tag de sistema; los tags manuales se agregan sin duplicar
+    # (comparación case-insensitive para no repetir ctv-express ni variantes).
     metatags = ["ctv-express"]
+    seen = {"ctv-express"}
     for tg in (tags or []):
-        if tg and tg not in metatags:
+        if tg and tg.lower() not in seen:
+            seen.add(tg.lower())
             metatags.append(tg)
 
     # Inicializar clientes

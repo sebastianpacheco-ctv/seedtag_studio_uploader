@@ -733,7 +733,8 @@ class StudioAPIClient:
             try:
                 tree["props"]["editor"]["metatags"] = metatags
             except (KeyError, TypeError):
-                pass
+                log.warning(f"Studio API: creativeTree de {creative_id} sin props.editor; "
+                            f"metatags no aplicados al árbol")
         creative_input = {
             "id": current["id"],
             "name": current["name"],

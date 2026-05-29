@@ -1688,7 +1688,7 @@
   function nameTokens(text) {
     return (text || '')
       .toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '') // sin acentos
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // sin acentos (combining marks)
       .split(/[^a-z0-9]+/)
       .filter(tok => tok.length >= 3);
   }
@@ -1913,7 +1913,10 @@
   }
   function addManualTag(raw) {
     const tag = (raw || '').trim();
-    if (!tag || tag === 'ctv-express' || manualTags.includes(tag) || manualTags.length >= 20) return;
+    if (!tag || tag.length > 64 || manualTags.length >= 20) return;
+    const low = tag.toLowerCase();
+    // dedup case-insensitive y sin repetir el tag de sistema 'ctv-express'
+    if (low === 'ctv-express' || manualTags.some(x => x.toLowerCase() === low)) return;
     manualTags.push(tag);
     renderTagChips();
   }
