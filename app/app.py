@@ -86,6 +86,9 @@ MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "300"))
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".webm"}
 MAX_FILES_PER_BATCH = int(os.getenv("MAX_FILES_PER_BATCH", "50"))
+# Tipos de creative CTV soportados (templateShortCode de Studio):
+# CSV-CTV (estándar) · CBV-CTV (frame) · CID-CTV (bespoke).
+ALLOWED_VIDEO_TYPES = {"CSV-CTV", "CBV-CTV", "CID-CTV"}
 
 # Initialize SQLite database schema
 database.init_db()
@@ -349,6 +352,11 @@ def upload():
     country = request.form.get("country", "auto")
     category = request.form.get("category", "auto")
 
+    # Tipo de creative CTV: solo shortCodes conocidos; default al estándar.
+    video_type = request.form.get("video_type", "CSV-CTV")
+    if video_type not in ALLOWED_VIDEO_TYPES:
+        video_type = "CSV-CTV"
+
     # Tags manuales (metatags) del usuario: coma-separados. Normalizar y limitar.
     raw_tags = request.form.get("tags", "")
     tags = []
@@ -385,7 +393,7 @@ def upload():
     # Arrancar hilo worker en background
     t = threading.Thread(
         target=_run_job,
-        args=(job_id, jwt, ticket_key, country, category, user_email, tags),
+        args=(job_id, jwt, ticket_key, country, category, user_email, tags, video_type),
         daemon=True
     )
     t.start()
@@ -460,7 +468,7 @@ def history():
 
 # ── Worker ─────────────────────────────────────────────────────────────────--
 def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str,
-             user_email: str, tags: list | None = None):
+             user_email: str, tags: list | None = None, video_type: str = "CSV-CTV"):
     """
     Worker que se ejecuta en segundo plano.
     Procesa secuencialmente cada video subiendo a Studio, esperando a que se procese,
@@ -519,7 +527,8 @@ def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str
                     initial_wait=10,  # 10s wait antes del primer check
                     retry_wait=10,   # 10s entre reintentos
                     max_retries=15,   # Total ~160s máx (muy razonable para CTV)
-                    metatags=metatags
+                    metatags=metatags,
+                    template_short_code=video_type
                 )
 
                 preview_url = sres["preview_url"]

@@ -1160,6 +1160,16 @@
         </div>
       </div>
 
+      <!-- Tipo de creative CTV -->
+      <div class="form-group">
+        <label for="video-type-select" data-i18n="videoTypeLabel">Tipo de video</label>
+        <select id="video-type-select">
+          <option value="CSV-CTV" selected data-i18n="videoTypeCsv">CSV (estándar)</option>
+          <option value="CBV-CTV" data-i18n="videoTypeFrame">Frame (CBV)</option>
+          <option value="CID-CTV" data-i18n="videoTypeBespoke">Bespoke (CID)</option>
+        </select>
+      </div>
+
       <!-- Tags manuales (metatags) -->
       <div class="form-group">
         <label for="tag-input" data-i18n="tagsLabel">Tags (opcional)</label>
@@ -1359,6 +1369,10 @@
       categoryRetail: 'Comercio (Retail)',
       categoryTechnology: 'Tecnología (Technology)',
       categoryTravel: 'Viajes & Transporte (Travel)',
+      videoTypeLabel: 'Tipo de video',
+      videoTypeCsv: 'CSV (estándar)',
+      videoTypeFrame: 'Frame (CBV)',
+      videoTypeBespoke: 'Bespoke (CID)',
       tagsLabel: 'Tags (opcional)',
       tagsPlaceholder: 'Escribí un tag y Enter…',
       tagsHint: "Enter o coma para agregar. 'ctv-express' se incluye siempre.",
@@ -1464,6 +1478,10 @@
       categoryRetail: 'Retail',
       categoryTechnology: 'Technology',
       categoryTravel: 'Travel & Transportation',
+      videoTypeLabel: 'Video type',
+      videoTypeCsv: 'CSV (standard)',
+      videoTypeFrame: 'Frame (CBV)',
+      videoTypeBespoke: 'Bespoke (CID)',
       tagsLabel: 'Tags (optional)',
       tagsPlaceholder: 'Type a tag and press Enter…',
       tagsHint: "Enter or comma to add. 'ctv-express' is always included.",
@@ -1956,6 +1974,7 @@
     fd.append('ticket_link', ticketInput.value);
     fd.append('country', document.getElementById('country-select').value);
     fd.append('category', document.getElementById('category-select').value);
+    fd.append('video_type', document.getElementById('video-type-select').value);
     fd.append('tags', manualTags.join(','));
     chosenFiles.forEach(file => {
       fd.append('videos', file);

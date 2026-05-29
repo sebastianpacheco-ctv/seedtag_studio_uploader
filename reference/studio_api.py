@@ -350,12 +350,17 @@ class StudioAPIClient:
     def build_csv_ctv_ad_template(video_id: str, name: str, formats: list,
                                   country: str = None, category: str = None,
                                   configuration: str = "none",
-                                  metatags: list = None) -> dict:
+                                  metatags: list = None,
+                                  template_short_code: str = "CSV-CTV") -> dict:
         """
-        Construye el AdTemplateInputType para un creative CSV-CTV.
+        Construye el AdTemplateInputType para un creative de video CTV.
 
         Estructura derivada de un creative real (referencia
-        guardada en tmp/ctv_template_reference_*.json).
+        guardada en tmp/ctv_template_reference_*.json). Los tres formatos de video
+        CTV comparten estructura idéntica y solo difieren en el template:
+          - CSV-CTV (estándar) · CBV-CTV (frame) · CID-CTV (bespoke)
+        Se controla con `template_short_code` (verificado leyendo creas reales de
+        cada tipo con getCreativeById).
 
         Args:
             video_id: ID del vídeo (devuelto por uploadVideo)
@@ -406,7 +411,7 @@ class StudioAPIClient:
             "name": name,
             "size": "600x600",
             "productFamily": "ctv",
-            "shortCode": "CSV-CTV",
+            "shortCode": template_short_code,
             "manifest": {
                 "messages": [
                     "click", "close", "error", "impression", "bounce",
@@ -445,7 +450,7 @@ class StudioAPIClient:
                         "additional": {"html": "", "css": "", "js": ""},
                         "externalPreviewContent": {"contextDataOverride": []},
                         "libraries": [],
-                        "template": {"id": "CSV-CTV", "version": 1},
+                        "template": {"id": template_short_code, "version": 1},
                         "contexts": [],
                         "metatags": metatags,
                         "isPreset": False,
@@ -479,7 +484,8 @@ class StudioAPIClient:
                                   country: str = None, category: str = None,
                                   initial_wait: int = 10, retry_wait: int = 10,
                                   max_retries: int = 15,
-                                  metatags: list = None) -> dict:
+                                  metatags: list = None,
+                                  template_short_code: str = "CSV-CTV") -> dict:
         """
         Flujo end-to-end:
           1. Sube el vídeo
@@ -521,6 +527,7 @@ class StudioAPIClient:
             country=country,
             category=category,
             metatags=metatags,
+            template_short_code=template_short_code,
         )
         creative_id = self.create_cov_creative(ad_template)
         log.info(f"Studio API: creative CSV-CTV creado id={creative_id}")
