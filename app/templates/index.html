@@ -807,6 +807,27 @@
       white-space: nowrap;
     }
 
+    .history-links-btn {
+      margin-left: 8px;
+      border: 1px solid var(--grey-4);
+      background: rgba(255, 255, 255, 0.04);
+      color: #10B981;
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .history-links-btn:hover { border-color: #10B981; }
+    .history-links-btn.open { background: rgba(16, 185, 129, 0.12); }
+
+    .history-links-detail td {
+      background: rgba(255, 255, 255, 0.02);
+      padding: 14px 16px;
+    }
+
     /* History / Past Uploads Section */
     .history-table-wrapper {
       overflow-x: auto;
@@ -2155,6 +2176,7 @@
         return;
       }
 
+      historyLinks = {};
       tbody.innerHTML = j.history.map(job => {
         const date = new Date(job.created_at).toLocaleString();
         const safeTicket = escapeHtml(job.ticket_key);
@@ -2162,7 +2184,9 @@
         const safeUser = escapeHtml(job.user_email);
         const successItems = Number(job.success_items || 0);
         const totalItems = Number(job.total_items || 0);
-        
+        const links = Array.isArray(job.links) ? job.links.filter(l => /^https?:\/\//i.test(l.url || '')) : [];
+        historyLinks[job.job_id] = links;
+
         let statusBadge = '';
         if (job.status === 'done') {
           statusBadge = `<span class="history-done">${escapeHtml(t('historyDone'))}</span>`;
@@ -2172,19 +2196,64 @@
           statusBadge = `<span class="history-failed">${escapeHtml(t('historyFailed'))}</span>`;
         }
 
+        const linksToggle = links.length
+          ? `<button type="button" class="history-links-btn" onclick="toggleHistoryLinks('${escapeHtml(job.job_id)}', this)">🔗 ${links.length}</button>`
+          : `<span class="drop-subtext">—</span>`;
+
+        const detailRow = links.length
+          ? `<tr class="history-links-detail" id="links-${escapeHtml(job.job_id)}" hidden>
+               <td colspan="5">
+                 <div class="links-summary-head">
+                   <span class="links-summary-title" data-i18n="linksSummaryTitle">${escapeHtml(t('linksSummaryTitle'))}</span>
+                   <button type="button" class="btn-secondary" onclick="copyJobLinks('${escapeHtml(job.job_id)}', this)">${escapeHtml(t('copyAllLinks'))}</button>
+                 </div>
+                 <ul class="links-list">
+                   ${links.map(l => `<li><span class="link-file" title="${escapeHtml(l.filename)}">🎬 ${escapeHtml(l.filename)}</span><a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.url)}</a></li>`).join('')}
+                 </ul>
+               </td>
+             </tr>`
+          : '';
+
         return `
           <tr>
             <td class="history-ticket">${safeTicket}</td>
             <td class="history-date">${safeDate}</td>
             <td>${safeUser}</td>
-            <td style="font-weight: 500;">${successItems} / ${totalItems} ${escapeHtml(t('ok'))}</td>
+            <td style="font-weight: 500;">${successItems} / ${totalItems} ${escapeHtml(t('ok'))} ${linksToggle}</td>
             <td>${statusBadge}</td>
           </tr>
+          ${detailRow}
         `;
       }).join('');
     } catch (err) {
       console.error("Error al cargar historial", err);
     }
+  }
+
+  // Links del historial: toggle de la fila de detalle + copiar (los links de Studio
+  // generados, accesibles desde el historial).
+  let historyLinks = {};
+  function toggleHistoryLinks(jobId, btn) {
+    const row = document.getElementById(`links-${jobId}`);
+    if (!row) return;
+    row.hidden = !row.hidden;
+    btn.classList.toggle('open', !row.hidden);
+  }
+
+  async function copyJobLinks(jobId, btn) {
+    const links = historyLinks[jobId] || [];
+    if (!links.length) return;
+    const text = links.map(l => `${l.filename}: ${l.url}`).join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+    }
+    btn.textContent = t('copiedLinks');
+    setTimeout(() => { btn.textContent = t('copyAllLinks'); }, 1500);
   }
 </script>
 </body>

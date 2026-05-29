@@ -149,9 +149,27 @@ def get_history(limit: int = 50, user_email: str | None = None) -> list[dict]:
                 LIMIT ?
             """, params).fetchall()
             history = []
+            job_ids = [row["job_id"] for row in rows]
+
+            # Traer los preview links (items 'done') de todos los jobs en UNA query y
+            # agruparlos por job, para mostrarlos en el historial sin N+1.
+            links_by_job = {}
+            if job_ids:
+                placeholders = ",".join("?" for _ in job_ids)
+                link_rows = conn.execute(
+                    f"SELECT job_id, filename, url FROM job_items "
+                    f"WHERE status = 'done' AND url IS NOT NULL AND job_id IN ({placeholders})",
+                    job_ids,
+                ).fetchall()
+                for lr in link_rows:
+                    links_by_job.setdefault(lr["job_id"], []).append(
+                        {"filename": lr["filename"], "url": lr["url"]}
+                    )
+
             for row in rows:
                 d = dict(row)
                 d["done"] = bool(d["done"])  # contrato consistente con get_job (L5)
+                d["links"] = links_by_job.get(d["job_id"], [])
                 history.append(d)
             return history
 
