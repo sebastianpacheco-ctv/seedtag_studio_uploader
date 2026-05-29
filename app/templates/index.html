@@ -1172,6 +1172,8 @@
       googleSso: 'Google SSO',
       ticketHeader: 'Ticket',
       videosHeader: 'Videos',
+      authErrorDomain: 'Acceso denegado: solo cuentas corporativas autorizadas pueden ingresar.',
+      authErrorGeneric: 'No se pudo completar el inicio de sesión con Google. Intentá de nuevo.',
       jwtPlaceholder: 'Pegá el JWT de tu cookie seedtag_jwt (ej: eyJ...)',
       link: 'Vincular',
       jwtHelpPrefix: '¿Cómo obtenerlo? Entra a',
@@ -1266,6 +1268,8 @@
       googleSso: 'Google SSO',
       ticketHeader: 'Ticket',
       videosHeader: 'Videos',
+      authErrorDomain: 'Access denied: only authorized corporate accounts can sign in.',
+      authErrorGeneric: 'Could not complete Google sign-in. Please try again.',
       jwtPlaceholder: 'Paste the JWT from your seedtag_jwt cookie (e.g. eyJ...)',
       link: 'Link',
       jwtHelpPrefix: 'How to get it? Open',
@@ -1435,6 +1439,14 @@
     applyLanguage(currentLang);
     fetchAuthStatus();
     loadHistory();
+
+    // Mostrar errores del callback OIDC y limpiar la URL (C1).
+    const authError = new URLSearchParams(window.location.search).get('auth_error');
+    if (authError) {
+      alert(authError === 'domain' ? t('authErrorDomain') : t('authErrorGeneric'));
+      const clean = window.location.pathname + (currentLang ? `?lang=${currentLang}` : '');
+      window.history.replaceState({}, '', clean);
+    }
   });
 
   // Format bytes
@@ -1492,7 +1504,14 @@
   }
 
   // Google SSO simulated login modal trigger
+  let oidcEnabled = false;
+
   function loginSSO() {
+    // Con OIDC real, redirigir a Google; el modal simulado es solo para dev (C1).
+    if (oidcEnabled) {
+      window.location.href = '/auth/login';
+      return;
+    }
     const modal = document.getElementById('sso-modal');
     modal.removeAttribute('hidden');
     // Allow display rule to trigger, then add active class for smooth transition
@@ -1558,6 +1577,7 @@
   async function fetchAuthStatus() {
     const r = await fetch('/api/auth-status');
     const j = await r.json();
+    oidcEnabled = !!j.oidc_enabled;
     const authPanel = document.getElementById('auth-panel');
     const studioStatusBadge = document.getElementById('studio-status');
 

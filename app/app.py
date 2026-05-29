@@ -15,8 +15,9 @@ import requests
 from functools import wraps
 from pathlib import Path
 
-from flask import Flask, request, jsonify, render_template, session, Response
+from flask import Flask, request, jsonify, render_template, session, Response, redirect, url_for
 from werkzeug.utils import secure_filename
+from authlib.integrations.flask_client import OAuth
 
 # Add reference/ directory to python path to import the real Studio client.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "reference"))
@@ -56,6 +57,25 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "True").lower() == "true",
 )
+
+# ── Auth de la app: Google OIDC real (C1) ──────────────────────────────────────
+# Solo dominios de este workspace pueden entrar.
+ALLOWED_EMAIL_DOMAIN = os.getenv("ALLOWED_EMAIL_DOMAIN", "seedtag.com")
+# OIDC se activa solo si hay credenciales OAuth. Si no, cae al login simulado (dev).
+OIDC_ENABLED = bool(os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"))
+
+oauth = OAuth(app)
+if OIDC_ENABLED:
+    oauth.register(
+        name="google",
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile", "hd": ALLOWED_EMAIL_DOMAIN},
+    )
+elif not IS_DEBUG:
+    # En producción sin OIDC, el login simulado dejaría entrar a cualquiera (C1).
+    print("WARNING: OIDC no configurado en producción — el login simulado está deshabilitado.")
 
 TMP = Path(os.getenv("TMP_DIR", "./tmp"))
 TMP.mkdir(parents=True, exist_ok=True)
@@ -168,11 +188,50 @@ def index():
     return render_template("index.html")
 
 
+# ── Auth de la app ─────────────────────────────────────────────────────────--
+@app.get("/auth/login")
+def auth_login():
+    """Inicia el flujo OIDC de Google (C1)."""
+    if not OIDC_ENABLED:
+        return jsonify({"ok": False, "error": "OIDC no configurado en este entorno"}), 404
+    redirect_uri = os.getenv("OAUTH_REDIRECT_URI") or url_for("auth_callback", _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.get("/auth/callback")
+def auth_callback():
+    """Callback de Google: valida el token y exige el dominio del workspace (C1)."""
+    if not OIDC_ENABLED:
+        return jsonify({"ok": False, "error": "OIDC no configurado en este entorno"}), 404
+    try:
+        token = oauth.google.authorize_access_token()
+    except Exception:
+        return redirect("/?auth_error=1")
+
+    userinfo = token.get("userinfo") or {}
+    email = (userinfo.get("email") or "").lower()
+    verified = userinfo.get("email_verified", False)
+
+    # Solo correos verificados del dominio permitido.
+    if not verified or not email.endswith("@" + ALLOWED_EMAIL_DOMAIN.lower()):
+        session.clear()
+        return redirect("/?auth_error=domain")
+
+    session["user_email"] = email
+    session["user_name"] = userinfo.get("name") or email
+    return redirect("/")
+
+
 @app.post("/api/login")
 def login():
-    """Simula Google Workspace SSO para el equipo."""
-    session["user_email"] = "sebastian.pacheco@seedtag.com"
-    session["user_name"] = "Sebastian Pacheco"
+    """Login simulado para desarrollo. Se deshabilita si OIDC está activo, para no
+    dejar entrar a cualquiera saltándose Google (C1)."""
+    if OIDC_ENABLED:
+        return jsonify({"ok": False, "error": "Usá el inicio de sesión con Google."}), 403
+    if not IS_DEBUG:
+        return jsonify({"ok": False, "error": "Login no disponible: configurá OIDC."}), 403
+    session["user_email"] = os.getenv("DEV_SSO_EMAIL", "sebastian.pacheco@seedtag.com")
+    session["user_name"] = os.getenv("DEV_SSO_NAME", "Sebastian Pacheco")
     return jsonify({
         "ok": True,
         "email": session["user_email"],
@@ -191,13 +250,14 @@ def logout():
 def auth_status():
     """Retorna el estado de autenticación actual (SSO y Studio JWT)."""
     jwt = get_user_studio_jwt()
-    # Si hay JWT en sesión, intentamos verificarlo en background o simplemente retornamos los datos guardados
     return jsonify({
         "sso_user": session.get("user_email"),
         "sso_name": session.get("user_name"),
         "studio_user": session.get("studio_user_email"),
         "studio_name": session.get("studio_user_name"),
-        "has_jwt": bool(jwt)
+        "has_jwt": bool(jwt),
+        "oidc_enabled": OIDC_ENABLED,
+        "allowed_domain": ALLOWED_EMAIL_DOMAIN
     })
 
 
