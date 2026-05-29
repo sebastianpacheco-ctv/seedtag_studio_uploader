@@ -2,9 +2,13 @@
 Unit tests for Studio Batch Uploader backend helper functions.
 Verifies ticket key parsing, project validation, and metadata mapping.
 """
+import os
 import unittest
 import sys
 from pathlib import Path
+
+# Importar app en modo dev: evita el fail-closed de FLASK_SECRET_KEY al importar (C2).
+os.environ.setdefault("FLASK_DEBUG", "True")
 
 # Add app/ and reference/ directories to path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
