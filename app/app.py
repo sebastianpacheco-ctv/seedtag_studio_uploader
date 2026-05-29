@@ -69,6 +69,20 @@ MAX_FILES_PER_BATCH = int(os.getenv("MAX_FILES_PER_BATCH", "50"))
 # Initialize SQLite database schema
 database.init_db()
 
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+@app.before_request
+def csrf_protect():
+    """CSRF para una API basada en fetch: exigir el header X-Requested-With en métodos
+    que cambian estado. Un sitio atacante no puede setear ese header en un POST cross-site
+    (ni por <form> ni por fetch sin que falle el preflight CORS). Combinado con
+    SameSite=Lax, bloquea CSRF sin tokens (A1)."""
+    if request.method in SAFE_METHODS:
+        return
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return jsonify({"ok": False, "error": "Solicitud rechazada por protección CSRF."}), 403
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def ticket_key_from_link(link: str) -> str | None:

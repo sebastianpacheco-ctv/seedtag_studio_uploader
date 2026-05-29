@@ -1518,7 +1518,7 @@
     activeItem.style.pointerEvents = 'none';
 
     try {
-      const r = await fetch('/api/login', { method: 'POST' });
+      const r = await fetch('/api/login', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
       const j = await r.json();
       if (j.ok) {
         setTimeout(() => {
@@ -1543,7 +1543,7 @@
 
   // Google SSO simulated logout
   async function logoutSSO() {
-    const r = await fetch('/api/logout', { method: 'POST' });
+    const r = await fetch('/api/logout', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
     const j = await r.json();
     if (j.ok) {
       isStudioConnected = false;
@@ -1616,7 +1616,7 @@
     try {
       const r = await fetch('/api/set-jwt', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ jwt })
       });
       const j = await r.json();
@@ -1697,6 +1697,7 @@
     try {
       const r = await fetch('/api/upload', {
         method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: fd
       });
       const j = await r.json();
