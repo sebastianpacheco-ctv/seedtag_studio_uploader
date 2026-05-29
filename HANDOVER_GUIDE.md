@@ -55,6 +55,7 @@ Diseñado meticulosamente siguiendo las pautas de marca de Seedtag:
 - **Tipografía**: `Instrument Sans` para textos generales e `Instrument Serif Italic` para enfatizar titulares claves.
 - **Interactividad**: Drag & Drop animado, visor de cola activa con polling dinámico cada 2s, y buscador de historial de subidas anteriores.
 - **Auto-detección**: Listener con *debounce* (800ms) que consulta la API de Jira y auto-selecciona los metadatos adecuados.
+- **Bilingüe (ES/EN)**: Toggle en el header. Todo el texto estático usa atributos `data-i18n` / `data-i18n-placeholder` que rellena `applyLanguage()`, y el texto dinámico (alertas, badges de estado, cola, historial, modal SSO) pasa por el helper `t(key)` con diccionarios `es`/`en`. El idioma se resuelve en este orden: query param `?lang=` → `localStorage` (`studio-uploader-lang`) → `es` por defecto. Un valor inválido cae a `es`. Para agregar texto nuevo: añade la clave a **ambos** diccionarios y marca el elemento con `data-i18n` (estático) o usa `t('clave')` (dinámico).
 
 ---
 

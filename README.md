@@ -9,6 +9,8 @@ un ticket Jira `SDS-XXXX` y devolver previews listas para revisar.
 - Cliente real de Studio via GraphQL reutilizado desde `reference/studio_api.py`.
 - Integracion Jira tolerante a fallos para leer pais/categoria y comentar el reporte final.
 - UI web con drag and drop, estado en vivo via SSE e historial de subidas.
+- Interfaz bilingue ES/EN con toggle en el header (persistido en `localStorage` y
+  forzable con `?lang=es|en`).
 - Dockerfile y configuracion de Firebase Hosting para enrutar a Cloud Run.
 
 ## Estructura
