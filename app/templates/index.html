@@ -214,6 +214,52 @@
       height: 14px;
     }
 
+    .config-drawer {
+      margin: -16px 0 24px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      background: rgba(47, 46, 46, 0.22);
+      backdrop-filter: blur(10px);
+    }
+
+    .config-drawer summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .config-drawer summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .config-summary-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .config-summary-title svg {
+      width: 18px;
+      height: 18px;
+      color: var(--coral);
+    }
+
+    .config-content {
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 18px;
+    }
+
+    .config-drawer .auth-status-badge {
+      margin-top: 0;
+      flex-shrink: 0;
+    }
+
     /* Grid Layout */
     .grid {
       display: grid;
@@ -846,31 +892,35 @@
     </div>
   </header>
 
-  <div class="grid">
-    <!-- Panel 1: Autenticación de Studio -->
-    <section class="card" id="studio-auth-card">
-      <div class="card-title">
+  <details class="config-drawer" id="config-panel">
+    <summary>
+      <span class="config-summary-title">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.607 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
-        Vincular cuenta de Studio
-      </div>
-      <div class="form-group last">
+        Configuración
+      </span>
+      <span id="studio-status" class="auth-status-badge badge-disconnected">
+        Cuenta Studio no detectada
+      </span>
+    </summary>
+    <div class="config-content">
+      <div class="form-group last" id="studio-auth-card">
         <label>JWT Token de Studio (cookie <code>seedtag_jwt</code>)</label>
         <div class="input-wrapper" style="display: flex; gap: 10px;">
           <input type="text" id="jwt-token" placeholder="Pegá el JWT de tu cookie seedtag_jwt (ej: eyJ...)" style="flex: 1;">
           <button class="btn-secondary" onclick="saveJwt()" style="min-width: 120px;">Vincular</button>
         </div>
-        <div id="studio-status" class="auth-status-badge badge-disconnected">
-          🔴 Cuenta desconectada
-        </div>
         <p class="drop-subtext" style="margin-top: 8px;">
           ¿Cómo obtenerlo? Entra a <a href="https://studio.seedtag.com" target="_blank" style="color: var(--coral); text-decoration: underline;">Studio Seedtag</a>, abre DevTools (F12) → Aplicación / Cookies → Busca la clave <code>seedtag_jwt</code> y copia su valor.
         </p>
       </div>
-    </section>
+    </div>
+  </details>
 
-    <!-- Panel 2: Formulario Batch Uploader -->
+  <div class="grid">
+    <!-- Panel 1: Formulario Batch Uploader -->
     <section class="card">
       <div class="card-title">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1223,15 +1273,19 @@
       `;
     }
 
-    // Studio JWT connection status updates
-    if (j.has_jwt && j.studio_user) {
+    // Studio JWT connection status updates. A JWT can come from session or local .env.
+    if (j.has_jwt) {
       isStudioConnected = true;
       studioStatusBadge.className = 'auth-status-badge badge-connected';
-      studioStatusBadge.innerHTML = `🟢 Conectado: ${escapeHtml(j.studio_name || 'Studio')} (${escapeHtml(j.studio_user)})`;
+      if (j.studio_user) {
+        studioStatusBadge.innerHTML = `Conectado: ${escapeHtml(j.studio_name || 'Studio')} (${escapeHtml(j.studio_user)})`;
+      } else {
+        studioStatusBadge.innerHTML = `Studio configurado`;
+      }
     } else {
       isStudioConnected = false;
       studioStatusBadge.className = 'auth-status-badge badge-disconnected';
-      studioStatusBadge.innerHTML = `🔴 Cuenta desconectada`;
+      studioStatusBadge.innerHTML = `Cuenta Studio no detectada`;
     }
     checkFormValidity();
   }
