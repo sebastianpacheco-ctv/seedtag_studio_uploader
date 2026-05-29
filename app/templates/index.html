@@ -678,6 +678,63 @@
       text-decoration: underline;
     }
 
+    /* Resumen consolidado de links */
+    #links-summary {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .links-summary-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .links-summary-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .links-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .links-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      overflow: hidden;
+    }
+
+    .links-list .link-file {
+      color: var(--grey-2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 40%;
+    }
+
+    .links-list a {
+      color: #10B981;
+      text-decoration: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .links-list a:hover {
+      text-decoration: underline;
+    }
+
     /* History / Past Uploads Section */
     .history-table-wrapper {
       overflow-x: auto;
@@ -1066,6 +1123,15 @@
       <div class="progress-cards" id="progress-container">
         <!-- Will be populated dynamically via JavaScript -->
       </div>
+
+      <!-- Resumen consolidado de links de Studio generados -->
+      <div id="links-summary" hidden>
+        <div class="links-summary-head">
+          <span class="links-summary-title" data-i18n="linksSummaryTitle">Links de preview generados</span>
+          <button type="button" class="btn-secondary" id="copy-links-btn" onclick="copyAllLinks()" data-i18n="copyAllLinks">Copiar todos</button>
+        </div>
+        <ul id="links-list" class="links-list"></ul>
+      </div>
     </section>
 
     <!-- Panel 4: Historial de Subidas -->
@@ -1214,6 +1280,9 @@
       uploadButton: 'Subir lote a Studio',
       queueStatus: 'Estado de la cola',
       completed: 'completados',
+      linksSummaryTitle: 'Links de preview generados',
+      copyAllLinks: 'Copiar todos',
+      copiedLinks: '¡Copiado!',
       historyTitle: 'Historial de subidas',
       dateTime: 'Fecha y Hora',
       user: 'Usuario',
@@ -1311,6 +1380,9 @@
       uploadButton: 'Upload batch to Studio',
       queueStatus: 'Queue status',
       completed: 'completed',
+      linksSummaryTitle: 'Generated preview links',
+      copyAllLinks: 'Copy all',
+      copiedLinks: 'Copied!',
       historyTitle: 'Upload history',
       dateTime: 'Date and time',
       user: 'User',
@@ -1782,11 +1854,15 @@
       container.innerHTML = '';
 
       let doneCount = 0;
+      const doneLinks = [];
       j.items.forEach(it => {
         const state = statusKind(it.status);
         // Un item está "resuelto" (no en cola) si terminó, falló, o ya se entregó
         // a Studio para procesado asíncrono (M3).
         if (state === 'done' || state === 'error' || state === 'processing') doneCount++;
+        if (state === 'done' && /^https?:\/\//i.test(it.url || '')) {
+          doneLinks.push({ filename: it.filename || 'video', url: it.url });
+        }
 
         const card = document.createElement('div');
         card.className = 'progress-item-card';
@@ -1823,6 +1899,7 @@
       });
 
       document.getElementById('job-progress-ratio').innerText = progressLabel(doneCount, j.items.length);
+      renderLinksSummary(doneLinks);
 
       if (j.done) {
         activeEventSource.close();
@@ -1834,6 +1911,44 @@
     activeEventSource.onerror = function(err) {
       console.warn("EventSource stream disconnected. It will auto-retry automatically.");
     };
+  }
+
+  // Resumen consolidado de los links de preview generados (#1)
+  let lastBatchLinks = [];
+  function renderLinksSummary(links) {
+    lastBatchLinks = links || [];
+    const box = document.getElementById('links-summary');
+    const list = document.getElementById('links-list');
+    if (!lastBatchLinks.length) {
+      box.hidden = true;
+      list.innerHTML = '';
+      return;
+    }
+    list.innerHTML = lastBatchLinks.map(l => `
+      <li>
+        <span class="link-file" title="${escapeHtml(l.filename)}">🎬 ${escapeHtml(l.filename)}</span>
+        <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.url)}</a>
+      </li>
+    `).join('');
+    box.hidden = false;
+  }
+
+  async function copyAllLinks() {
+    if (!lastBatchLinks.length) return;
+    const text = lastBatchLinks.map(l => `${l.filename}: ${l.url}`).join('\n');
+    const btn = document.getElementById('copy-links-btn');
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      // Fallback si clipboard API no está disponible (http/permite).
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+    }
+    const original = btn.textContent;
+    btn.textContent = t('copiedLinks');
+    setTimeout(() => { btn.textContent = t('copyAllLinks'); }, 1500);
   }
 
   // Poll history uploads
