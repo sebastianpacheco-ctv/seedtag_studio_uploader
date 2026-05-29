@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "seedtagstudiouploader"
-  }
+    "default": "decoded-theme-461808-d3"
+  },
+  "targets": {},
+  "etcFeatures": {}
 }

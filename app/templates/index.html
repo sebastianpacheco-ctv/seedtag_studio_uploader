@@ -658,6 +658,166 @@
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* Premium Google SSO Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(12px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-content {
+      background: rgba(15, 15, 15, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 440px;
+      padding: 40px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      transform: translateY(20px) scale(0.96);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .modal-overlay.active .modal-content {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-brand-logo {
+      height: 22px;
+      margin-bottom: 24px;
+    }
+
+    .modal-header-section {
+      text-align: center;
+      width: 100%;
+      margin-bottom: 30px;
+    }
+
+    .modal-title {
+      font-family: var(--font-sans);
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: var(--white);
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+
+    .modal-subtitle {
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      color: var(--grey-3);
+    }
+
+    .account-selector {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .account-item {
+      display: flex;
+      align-items: center;
+      padding: 16px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+      width: 100%;
+      text-align: left;
+    }
+
+    .account-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .account-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--coral);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--white);
+      margin-right: 14px;
+      flex-shrink: 0;
+    }
+
+    .account-avatar.other-avatar {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .account-details {
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .account-name {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--white);
+    }
+
+    .account-email {
+      font-family: var(--font-sans);
+      font-size: 0.8rem;
+      color: var(--grey-3);
+    }
+
+    .account-status {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #10B981;
+      background: rgba(16, 185, 129, 0.1);
+      padding: 3px 8px;
+      border-radius: 50px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      flex-shrink: 0;
+    }
+
+    .btn-modal-close {
+      background: none;
+      border: none;
+      color: var(--grey-3);
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .btn-modal-close:hover {
+      color: var(--white);
+    }
   </style>
 </head>
 <body>
@@ -840,10 +1000,49 @@
   </footer>
 </div>
 
+<!-- Premium Enterprise Google SSO Sign-In Selector Modal -->
+<div id="sso-modal" class="modal-overlay" hidden>
+  <div class="modal-content">
+    <div class="modal-header-section">
+      <img src="/static/logos/Seedtag Wordmark - White (RGB).svg" alt="Seedtag Logo" class="modal-brand-logo">
+      <h2 class="modal-title">Sign in</h2>
+      <p class="modal-subtitle">to continue to Seedtag Studio</p>
+    </div>
+    
+    <div class="account-selector">
+      <!-- Active Corporate Account -->
+      <div class="account-item active-account" onclick="selectAccount('sebastian.pacheco@seedtag.com')">
+        <div class="account-avatar">SP</div>
+        <div class="account-details">
+          <span class="account-name">Sebastian Pacheco</span>
+          <span class="account-email">sebastian.pacheco@seedtag.com</span>
+        </div>
+        <span class="account-status">Active</span>
+      </div>
+      
+      <!-- Option to Use Another Account -->
+      <div class="account-item use-other-account" onclick="useOtherAccount()">
+        <div class="account-avatar other-avatar">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16" style="color: var(--grey-3);">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+          </svg>
+        </div>
+        <div class="account-details">
+          <span class="account-name" style="color: var(--grey-2);">Use another account</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-footer" style="width: 100%; display: flex; justify-content: center; margin-top: 10px;">
+      <button class="btn-modal-close" onclick="closeSSOModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
   let chosenFiles = [];
   let isStudioConnected = false;
-  let activePollInterval = null;
+  let activeEventSource = null;
   let ticketDebounceTimeout = null;
 
   // Initialize Elements
@@ -913,13 +1112,54 @@
     uploadBtn.disabled = !(hasTicket && hasFiles && isStudioConnected);
   }
 
-  // Google SSO simulated login
-  async function loginSSO() {
-    const r = await fetch('/api/login', { method: 'POST' });
-    const j = await r.json();
-    if (j.ok) {
-      fetchAuthStatus();
+  // Google SSO simulated login modal trigger
+  function loginSSO() {
+    const modal = document.getElementById('sso-modal');
+    modal.removeAttribute('hidden');
+    // Allow display rule to trigger, then add active class for smooth transition
+    setTimeout(() => {
+      modal.classList.add('active');
+    }, 10);
+  }
+
+  function closeSSOModal() {
+    const modal = document.getElementById('sso-modal');
+    modal.classList.remove('active');
+    setTimeout(() => {
+      modal.setAttribute('hidden', '');
+    }, 400); // Wait for transition out
+  }
+
+  async function selectAccount(email) {
+    const activeItem = document.querySelector('.account-item.active-account');
+    const nameSpan = activeItem.querySelector('.account-name');
+    const originalText = nameSpan.textContent;
+
+    nameSpan.innerHTML = `<span>⏳ Autenticando...</span>`;
+    activeItem.style.pointerEvents = 'none';
+
+    try {
+      const r = await fetch('/api/login', { method: 'POST' });
+      const j = await r.json();
+      if (j.ok) {
+        setTimeout(() => {
+          nameSpan.textContent = originalText;
+          activeItem.style.pointerEvents = 'auto';
+          closeSSOModal();
+          fetchAuthStatus();
+        }, 1200); // realistic mock delay for SSO redirection
+      } else {
+        throw new Error();
+      }
+    } catch (e) {
+      nameSpan.textContent = originalText;
+      activeItem.style.pointerEvents = 'auto';
+      alert("Error simulando la autenticación de Google");
     }
+  }
+
+  function useOtherAccount() {
+    alert("Política Corporativa: Solo las cuentas de correo corporativas con dominio @seedtag.com están autorizadas para ingresar a Studio Batch Uploader. Por favor, selecciona la cuenta activa.");
   }
 
   // Google SSO simulated logout
@@ -1106,16 +1346,20 @@
     }
   }
 
-  // Poll active background job
+  // SSE stream handler for active background job updates
   function pollActiveJob(jobId) {
-    if (activePollInterval) clearInterval(activePollInterval);
+    if (activeEventSource) {
+      activeEventSource.close();
+    }
     
-    activePollInterval = setInterval(async () => {
-      const r = await fetch(`/api/job/${jobId}`);
-      const j = await r.json();
+    activeEventSource = new EventSource(`/api/job/${jobId}/stream`);
+    
+    activeEventSource.onmessage = function(event) {
+      const j = JSON.parse(event.data);
       
       if (!j.ok) {
-        clearInterval(activePollInterval);
+        activeEventSource.close();
+        alert("Error en el flujo en vivo: " + (j.error || "error desconocido"));
         return;
       }
 
@@ -1162,10 +1406,15 @@
       document.getElementById('job-progress-ratio').innerText = `${doneCount}/${j.items.length} completados`;
 
       if (j.done) {
-        clearInterval(activePollInterval);
+        activeEventSource.close();
+        activeEventSource = null;
         loadHistory(); // Reload history
       }
-    }, 2000); // Poll every 2 seconds
+    };
+
+    activeEventSource.onerror = function(err) {
+      console.warn("EventSource stream disconnected. It will auto-retry automatically.");
+    };
   }
 
   // Poll history uploads

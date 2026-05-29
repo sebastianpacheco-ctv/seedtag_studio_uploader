@@ -8,9 +8,11 @@ import re
 import sys
 import uuid
 import threading
+import json
+import time
 from pathlib import Path
 
-from flask import Flask, request, jsonify, render_template, session
+from flask import Flask, request, jsonify, render_template, session, Response
 
 # Add reference/ directory to python path to import the real Studio client.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "reference"))
@@ -18,6 +20,7 @@ from studio_api import (  # noqa: E402
     StudioAPIClient,
     StudioVideoNotReadyError,
     StudioJWTExpiredError,
+    StudioAPIError,
 )
 
 # Import our custom database and Jira client layers
@@ -199,6 +202,40 @@ def job_status(job_id):
     return jsonify({"ok": True, **job})
 
 
+@app.get("/api/job/<job_id>/stream")
+def job_status_stream(job_id):
+    """Yields SSE updates in real-time when SQLite database state changes."""
+    def event_generator():
+        last_state = None
+        # Max duration to prevent hanging connection indefinitely in dev / cloud servers
+        max_duration = 300  
+        start_time = time.time()
+        
+        while time.time() - start_time < max_duration:
+            job = database.get_job(job_id)
+            if not job:
+                yield f"data: {json.dumps({'ok': False, 'error': 'Job not found'})}\n\n"
+                break
+            
+            # Form standard state signature to compare
+            current_state = {
+                "status": job["status"],
+                "done": job["done"],
+                "items": [{"filename": it["filename"], "status": it["status"], "url": it["url"], "msg": it["msg"]} for it in job["items"]]
+            }
+            
+            if current_state != last_state:
+                last_state = current_state
+                yield f"data: {json.dumps({'ok': True, **job})}\n\n"
+                
+            if job["done"]:
+                break
+                
+            time.sleep(1)
+            
+    return Response(event_generator(), mimetype="text/event-stream")
+
+
 @app.get("/api/history")
 def history():
     """Retorna la lista de uploads recientes desde SQLite."""
@@ -241,38 +278,67 @@ def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str
         filename = item["filename"]
         filepath = Path(item["path"])
 
-        database.update_job_item(job_id, filename, status="uploading")
+        max_attempts = 3
+        jwt_expired = False
+        success = False
 
-        try:
-            # Flujo end-to-end de Studio
-            sres = studio.process_video_to_creative(
-                file_path=filepath,
-                ticket_title=filepath.stem,
-                country=mapped_country,
-                category=mapped_category,
-                initial_wait=10,  # 10s wait antes del primer check
-                retry_wait=10,   # 10s entre reintentos
-                max_retries=15    # Total ~160s máx (muy razonable para CTV)
-            )
+        for attempt in range(1, max_attempts + 1):
+            import time
+            import random
+            import requests
 
-            preview_url = sres["preview_url"]
-            database.update_job_item(job_id, filename, status="done", url=preview_url)
+            status_text = f"uploading [Attempt {attempt}/{max_attempts}]"
+            database.update_job_item(job_id, filename, status=status_text)
 
-        except StudioVideoNotReadyError as nre:
-            database.update_job_item(
-                job_id, filename, status="processing",
-                msg=f"Sigue procesando en Studio (video_id={nre.video_id})."
-            )
-        except StudioJWTExpiredError:
-            database.update_job_item(
-                job_id, filename, status="error",
-                msg="JWT de Studio expirado. Por favor, renuévalo en la interfaz."
-            )
-        except Exception as e:
-            database.update_job_item(
-                job_id, filename, status="error",
-                msg=str(e)
-            )
+            try:
+                # Flujo end-to-end de Studio
+                sres = studio.process_video_to_creative(
+                    file_path=filepath,
+                    ticket_title=filepath.stem,
+                    country=mapped_country,
+                    category=mapped_category,
+                    initial_wait=10,  # 10s wait antes del primer check
+                    retry_wait=10,   # 10s entre reintentos
+                    max_retries=15    # Total ~160s máx (muy razonable para CTV)
+                )
+
+                preview_url = sres["preview_url"]
+                database.update_job_item(job_id, filename, status="done", url=preview_url)
+                success = True
+                break
+
+            except StudioJWTExpiredError:
+                database.update_job_item(
+                    job_id, filename, status="error",
+                    msg="JWT de Studio expirado. Por favor, renuévalo en la interfaz."
+                )
+                jwt_expired = True
+                break
+
+            except StudioVideoNotReadyError as nre:
+                database.update_job_item(
+                    job_id, filename, status="processing",
+                    msg=f"Sigue procesando en Studio (video_id={nre.video_id})."
+                )
+                break
+
+            except (requests.exceptions.RequestException, StudioAPIError, Exception) as e:
+                if attempt < max_attempts:
+                    base_delay = 2.0
+                    delay = base_delay * (2 ** (attempt - 1)) + random.uniform(0.5, 1.5)
+                    database.update_job_item(
+                        job_id, filename, status=status_text,
+                        msg=f"Error temporal: {str(e)}. Reintentando en {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+                else:
+                    database.update_job_item(
+                        job_id, filename, status="error",
+                        msg=str(e)
+                    )
+
+        if jwt_expired:
+            break
 
         # Limpiar archivo temporal local una vez subido/fallado
         try:
