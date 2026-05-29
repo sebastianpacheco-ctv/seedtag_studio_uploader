@@ -1239,6 +1239,7 @@
       detectedInJira: 'Detectado en Jira',
       noJiraFields: 'Sin campos configurados en Jira. Se aplicarán valores por defecto.',
       jiraUnavailable: 'Jira no disponible o ticket inaccesible. Ingresa país/categoría manualmente.',
+      jiraLoginNeeded: 'Iniciá sesión con Google para auto-detectar desde Jira.',
       startingBatch: 'Iniciando lote...',
       batchStartError: 'Error al iniciar el lote',
       networkError: 'Error de red',
@@ -1335,6 +1336,7 @@
       detectedInJira: 'Detected in Jira',
       noJiraFields: 'No Jira fields configured. Default values will be applied.',
       jiraUnavailable: 'Jira unavailable or ticket inaccessible. Enter country/category manually.',
+      jiraLoginNeeded: 'Sign in with Google to auto-detect from Jira.',
       startingBatch: 'Starting batch...',
       batchStartError: 'Error starting batch',
       networkError: 'Network error',
@@ -1546,6 +1548,7 @@
           closeSSOModal();
           fetchAuthStatus();
           loadHistory(); // el historial requiere sesión; recargar tras login (M1)
+          if (ticketInput.value.trim()) handleTicketInput(); // re-detectar Jira ya logueado
         }, 1200); // realistic mock delay for SSO redirection
       } else {
         throw new Error();
@@ -1677,7 +1680,13 @@
       try {
         const r = await fetch(`/api/jira-detect/${key}`);
         const j = await r.json();
-        
+
+        if (r.status === 401) {
+          // No es un fallo de Jira: falta iniciar sesión (M1).
+          badgeContainer.innerHTML = `<div class="detection-badge">🔒 ${escapeHtml(t('jiraLoginNeeded'))}</div>`;
+          return;
+        }
+
         if (j.ok) {
           let badgeText = '';
           if (j.country || j.category) {
