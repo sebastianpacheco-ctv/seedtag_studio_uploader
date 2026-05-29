@@ -540,7 +540,7 @@ class StudioAPIClient:
         try:
             self.set_creative_dimensions(
                 creative_id, country=country, category=category,
-                configuration="none",
+                configuration="none", metatags=metatags,
             )
             log.info(f"Studio API: dimensions seteadas en {creative_id} "
                      f"(country={country}, category={category}, config=none)")
@@ -711,8 +711,9 @@ class StudioAPIClient:
     def set_creative_dimensions(self, creative_id: str,
                                 country: str = None,
                                 category: str = None,
-                                configuration: str = None) -> str:
-        """Setea country / category / configuration a NIVEL creative (top-level).
+                                configuration: str = None,
+                                metatags: list = None) -> str:
+        """Setea country / category / configuration / metatags a NIVEL creative.
 
         IMPORTANTE: estos son los campos que muestra la LISTA de Studio Manager
         (columnas Country / Category / Config). El bot ya los pone dentro del
@@ -721,10 +722,21 @@ class StudioAPIClient:
         del creative, que `createCovCreative` NO rellena. Hay que setearlos
         aparte con `updateCreative`, que es lo que hace este método.
 
+        metatags: si se pasa, sobreescribe los tags del creative. `createCovCreative`
+        IGNORA los metatags del adTemplate (siempre deja 'ctv-express'), así que los
+        tags manuales hay que aplicarlos acá, igual que el panel "Tags" de Studio:
+        viven en `creativeTree.props.editor.metatags`, no en el top-level.
+
         Internamente obtiene el creative actual (getCreativeById) y lo re-envía
         con los campos cambiados, porque updateCreative espera el modelo completo.
         """
         current = self.get_creative(creative_id)
+        tree = current.get("creativeTree")
+        if metatags is not None and isinstance(tree, dict):
+            try:
+                tree["props"]["editor"]["metatags"] = metatags
+            except (KeyError, TypeError):
+                pass
         creative_input = {
             "id": current["id"],
             "name": current["name"],
@@ -733,8 +745,8 @@ class StudioAPIClient:
             "templateShortCode": current.get("templateShortCode"),
             "loader": current.get("loader"),
             "manifest": current.get("manifest"),
-            "creativeTree": current.get("creativeTree"),
-            "metatags": current.get("metatags") or [],
+            "creativeTree": tree,
+            "metatags": metatags if metatags is not None else (current.get("metatags") or []),
             "isPreset": False,
             "isReadonly": False,
         }
