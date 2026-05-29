@@ -254,7 +254,12 @@
 
     .lang-btn.active {
       background: var(--coral);
-      color: var(--white);
+      color: #1a0207; /* texto oscuro sobre coral: contraste WCAG AA (L1) */
+    }
+
+    .lang-btn:focus-visible {
+      outline: 2px solid var(--coral);
+      outline-offset: 2px;
     }
 
     .config-drawer {
@@ -927,16 +932,16 @@
     </div>
     
     <div class="header-actions">
-      <div class="language-toggle" aria-label="Language">
-        <button type="button" class="lang-btn" data-lang-btn="es" onclick="setLanguage('es')">ES</button>
-        <button type="button" class="lang-btn" data-lang-btn="en" onclick="setLanguage('en')">EN</button>
+      <div class="language-toggle" role="group" aria-label="Language / Idioma">
+        <button type="button" class="lang-btn" data-lang-btn="es" aria-pressed="false" onclick="setLanguage('es')">ES</button>
+        <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="false" onclick="setLanguage('en')">EN</button>
       </div>
 
       <!-- User SSO Status Panel -->
       <div id="auth-panel">
         <button class="sso-btn" onclick="loginSSO()">
           <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google Logo">
-          Google SSO
+          <span data-i18n="googleSso">Google SSO</span>
         </button>
       </div>
     </div>
@@ -959,7 +964,7 @@
       <div class="form-group last" id="studio-auth-card">
         <label>JWT Token de Studio (cookie <code>seedtag_jwt</code>)</label>
         <div class="input-wrapper" style="display: flex; gap: 10px;">
-          <input type="text" id="jwt-token" data-i18n-placeholder="jwtPlaceholder" placeholder="Pegá el JWT de tu cookie seedtag_jwt (ej: eyJ...)" style="flex: 1;">
+          <input type="password" id="jwt-token" autocomplete="off" data-i18n-placeholder="jwtPlaceholder" placeholder="Pegá el JWT de tu cookie seedtag_jwt (ej: eyJ...)" style="flex: 1;">
           <button class="btn-secondary" onclick="saveJwt()" style="min-width: 120px;" data-i18n="link">Vincular</button>
         </div>
         <p class="drop-subtext" style="margin-top: 8px;">
@@ -1029,7 +1034,7 @@
       <!-- Drag & Drop Area -->
       <div class="form-group">
         <label data-i18n="videosLabel">Videos seleccionados</label>
-        <div class="drop-zone" id="drop-zone">
+        <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Seleccionar videos">
           <span class="drop-icon">🎬</span>
           <span class="drop-text" data-i18n="dropText">Arrastra tus videos aquí o haz click para explorar</span>
           <span class="drop-subtext" data-i18n="dropSubtext">Formatos admitidos: MP4, MOV, WebM.</span>
@@ -1055,7 +1060,7 @@
           <span data-i18n="queueStatus">Estado de la cola</span>
           <span class="job-badge" id="job-active-ticket">SDS-XXXX</span>
         </div>
-        <span class="drop-subtext" id="job-progress-ratio">0/0 completados</span>
+        <span class="drop-subtext" id="job-progress-ratio"></span>
       </div>
       
       <div class="progress-cards" id="progress-container">
@@ -1075,10 +1080,10 @@
         <table>
           <thead>
             <tr>
-              <th>Ticket</th>
+              <th data-i18n="ticketHeader">Ticket</th>
               <th data-i18n="dateTime">Fecha y Hora</th>
               <th data-i18n="user">Usuario</th>
-              <th>Videos</th>
+              <th data-i18n="videosHeader">Videos</th>
               <th data-i18n="status">Estado</th>
             </tr>
           </thead>
@@ -1144,7 +1149,16 @@
   let isStudioConnected = false;
   let activeEventSource = null;
   let ticketDebounceTimeout = null;
-  let currentLang = new URLSearchParams(window.location.search).get('lang') || localStorage.getItem('studio-uploader-lang') || 'es';
+  // localStorage puede lanzar en modo privado / con storage bloqueado; nunca dejar
+  // que rompa la carga del script (A7).
+  function safeStorageGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function safeStorageSet(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) { /* ignore */ }
+  }
+  const requestedLang = new URLSearchParams(window.location.search).get('lang');
+  let currentLang = requestedLang || safeStorageGet('studio-uploader-lang') || 'es';
 
   const translations = {
     es: {
@@ -1155,6 +1169,9 @@
       studioMissing: 'Cuenta Studio no detectada',
       studioConfigured: 'Studio configurado',
       studioConnected: 'Conectado',
+      googleSso: 'Google SSO',
+      ticketHeader: 'Ticket',
+      videosHeader: 'Videos',
       jwtPlaceholder: 'Pegá el JWT de tu cookie seedtag_jwt (ej: eyJ...)',
       link: 'Vincular',
       jwtHelpPrefix: '¿Cómo obtenerlo? Entra a',
@@ -1246,6 +1263,9 @@
       studioMissing: 'Studio account not detected',
       studioConfigured: 'Studio configured',
       studioConnected: 'Connected',
+      googleSso: 'Google SSO',
+      ticketHeader: 'Ticket',
+      videosHeader: 'Videos',
       jwtPlaceholder: 'Paste the JWT from your seedtag_jwt cookie (e.g. eyJ...)',
       link: 'Link',
       jwtHelpPrefix: 'How to get it? Open',
@@ -1361,7 +1381,7 @@
 
   function applyLanguage(lang) {
     currentLang = translations[lang] ? lang : 'es';
-    localStorage.setItem('studio-uploader-lang', currentLang);
+    safeStorageSet('studio-uploader-lang', currentLang);
     document.documentElement.lang = currentLang;
 
     document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -1371,7 +1391,9 @@
       el.setAttribute('placeholder', t(el.dataset.i18nPlaceholder));
     });
     document.querySelectorAll('[data-lang-btn]').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.langBtn === currentLang);
+      const isActive = btn.dataset.langBtn === currentLang;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
 
     resetUploadButton();
@@ -1385,6 +1407,13 @@
 
   // Trigger file browsing
   dropZone.onclick = () => fileInput.click();
+  // Accesible por teclado: el drop-zone es role="button" (L6).
+  dropZone.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      fileInput.click();
+    }
+  });
 
   // Drag & drop handlers
   ['dragover', 'dragleave', 'drop'].forEach(e => dropZone.addEventListener(e, ev => ev.preventDefault()));
@@ -1550,7 +1579,7 @@
       authPanel.innerHTML = `
         <button class="sso-btn" onclick="loginSSO()">
           <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google Logo">
-          Google SSO
+          ${escapeHtml(t('googleSso'))}
         </button>
       `;
     }
@@ -1723,9 +1752,9 @@
       let doneCount = 0;
       j.items.forEach(it => {
         const state = statusKind(it.status);
-        const isCompletedState = (state === 'done' || state === 'error' || state === 'processing');
-        if (isCompletedState && state !== 'processing') doneCount++;
-        if (state === 'processing') doneCount++; // Wait counts as processed in loop checks
+        // Un item está "resuelto" (no en cola) si terminó, falló, o ya se entregó
+        // a Studio para procesado asíncrono (M3).
+        if (state === 'done' || state === 'error' || state === 'processing') doneCount++;
 
         const card = document.createElement('div');
         card.className = 'progress-item-card';
@@ -1735,7 +1764,9 @@
 
         if (state === 'done') {
           statusText = t('ready');
-          actionColumn = `<a href="${escapeHtml(it.url || '#')}" target="_blank" class="preview-link-btn">🔗 ${escapeHtml(t('preview'))}</a>`;
+          // Solo aceptar URLs http(s); evita un href javascript: si el backend devolviera algo raro (L7).
+          const safePreviewUrl = /^https?:\/\//i.test(it.url || '') ? it.url : '#';
+          actionColumn = `<a href="${escapeHtml(safePreviewUrl)}" target="_blank" rel="noopener noreferrer" class="preview-link-btn">🔗 ${escapeHtml(t('preview'))}</a>`;
         } else if (state === 'error') {
           statusText = t('error');
           actionColumn = `<div class="item-error-msg">${escapeHtml(it.msg || t('processingError'))}</div>`;
