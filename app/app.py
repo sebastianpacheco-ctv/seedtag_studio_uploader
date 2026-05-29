@@ -347,6 +347,15 @@ def upload():
     country = request.form.get("country", "auto")
     category = request.form.get("category", "auto")
 
+    # Tags manuales (metatags) del usuario: coma-separados. Normalizar y limitar.
+    raw_tags = request.form.get("tags", "")
+    tags = []
+    for tg in raw_tags.split(","):
+        tg = tg.strip()
+        if tg and tg not in tags:
+            tags.append(tg)
+    tags = tags[:20]
+
     # Identificación del usuario de SSO o Studio
     user_email = session.get("user_email") or session.get("studio_user_email") or "usuario@seedtag.com"
 
@@ -374,7 +383,7 @@ def upload():
     # Arrancar hilo worker en background
     t = threading.Thread(
         target=_run_job,
-        args=(job_id, jwt, ticket_key, country, category, user_email),
+        args=(job_id, jwt, ticket_key, country, category, user_email, tags),
         daemon=True
     )
     t.start()
@@ -448,15 +457,24 @@ def history():
 
 
 # ── Worker ─────────────────────────────────────────────────────────────────--
-def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str, user_email: str):
+def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str,
+             user_email: str, tags: list | None = None):
     """
     Worker que se ejecuta en segundo plano.
     Procesa secuencialmente cada video subiendo a Studio, esperando a que se procese,
     creando el creative y actualizando SQLite. Al terminar, agrega un comentario en Jira.
+
+    tags: metatags manuales del usuario; se suman al tag de sistema 'ctv-express'.
     """
     job = database.get_job(job_id)
     if not job:
         return
+
+    # 'ctv-express' es el tag de sistema; los tags manuales se agregan sin duplicar.
+    metatags = ["ctv-express"]
+    for tg in (tags or []):
+        if tg and tg not in metatags:
+            metatags.append(tg)
 
     # Inicializar clientes
     studio = StudioAPIClient(jwt_cookie=jwt)
@@ -498,7 +516,8 @@ def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str
                     category=mapped_category,
                     initial_wait=10,  # 10s wait antes del primer check
                     retry_wait=10,   # 10s entre reintentos
-                    max_retries=15    # Total ~160s máx (muy razonable para CTV)
+                    max_retries=15,   # Total ~160s máx (muy razonable para CTV)
+                    metatags=metatags
                 )
 
                 preview_url = sres["preview_url"]

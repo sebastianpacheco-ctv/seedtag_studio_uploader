@@ -478,7 +478,8 @@ class StudioAPIClient:
                                   video_filename: str = None,
                                   country: str = None, category: str = None,
                                   initial_wait: int = 10, retry_wait: int = 10,
-                                  max_retries: int = 15) -> dict:
+                                  max_retries: int = 15,
+                                  metatags: list = None) -> dict:
         """
         Flujo end-to-end:
           1. Sube el vídeo
@@ -519,6 +520,7 @@ class StudioAPIClient:
             formats=formats,
             country=country,
             category=category,
+            metatags=metatags,
         )
         creative_id = self.create_cov_creative(ad_template)
         log.info(f"Studio API: creative CSV-CTV creado id={creative_id}")

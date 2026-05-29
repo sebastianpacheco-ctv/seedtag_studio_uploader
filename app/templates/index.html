@@ -735,6 +735,63 @@
       text-decoration: underline;
     }
 
+    /* Tags (metatags) chip input */
+    .tags-field {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--grey-4);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      cursor: text;
+    }
+
+    .tags-field:focus-within {
+      border-color: var(--coral);
+    }
+
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255, 107, 124, 0.15);
+      color: var(--coral);
+      font-size: 0.8rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .tag-chip.system-chip {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--grey-2);
+    }
+
+    .tag-chip .tag-remove {
+      cursor: pointer;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font-size: 0.9rem;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .tag-input {
+      flex: 1;
+      min-width: 120px;
+      border: 0;
+      background: transparent;
+      color: var(--white);
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      outline: none;
+      padding: 2px 0;
+    }
+
     /* History / Past Uploads Section */
     .history-table-wrapper {
       overflow-x: auto;
@@ -1088,6 +1145,17 @@
         </div>
       </div>
 
+      <!-- Tags manuales (metatags) -->
+      <div class="form-group">
+        <label for="tag-input" data-i18n="tagsLabel">Tags (opcional)</label>
+        <div class="tags-field" id="tags-field" onclick="document.getElementById('tag-input').focus()">
+          <span class="tag-chip system-chip" title="Tag de sistema">🏷️ ctv-express</span>
+          <input type="text" id="tag-input" class="tag-input" data-i18n-placeholder="tagsPlaceholder"
+                 placeholder="Escribí un tag y Enter…" onkeydown="handleTagKey(event)">
+        </div>
+        <span class="drop-subtext" data-i18n="tagsHint">Enter o coma para agregar. 'ctv-express' se incluye siempre.</span>
+      </div>
+
       <!-- Drag & Drop Area -->
       <div class="form-group">
         <label data-i18n="videosLabel">Videos seleccionados</label>
@@ -1274,6 +1342,9 @@
       categoryRetail: 'Comercio (Retail)',
       categoryTechnology: 'Tecnología (Technology)',
       categoryTravel: 'Viajes & Transporte (Travel)',
+      tagsLabel: 'Tags (opcional)',
+      tagsPlaceholder: 'Escribí un tag y Enter…',
+      tagsHint: "Enter o coma para agregar. 'ctv-express' se incluye siempre.",
       videosLabel: 'Videos seleccionados',
       dropText: 'Arrastra tus videos aquí o haz click para explorar',
       dropSubtext: 'Formatos admitidos: MP4, MOV, WebM.',
@@ -1374,6 +1445,9 @@
       categoryRetail: 'Retail',
       categoryTechnology: 'Technology',
       categoryTravel: 'Travel & Transportation',
+      tagsLabel: 'Tags (optional)',
+      tagsPlaceholder: 'Type a tag and press Enter…',
+      tagsHint: "Enter or comma to add. 'ctv-express' is always included.",
       videosLabel: 'Selected videos',
       dropText: 'Drag your videos here or click to browse',
       dropSubtext: 'Supported formats: MP4, MOV, WebM.',
@@ -1731,6 +1805,42 @@
     }
   }
 
+  // Tags manuales (metatags) — chips removibles (#2)
+  let manualTags = [];
+  function renderTagChips() {
+    const field = document.getElementById('tags-field');
+    const input = document.getElementById('tag-input');
+    // Quitar chips de usuario (mantener el system-chip y el input).
+    field.querySelectorAll('.tag-chip:not(.system-chip)').forEach(c => c.remove());
+    manualTags.forEach(tag => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.innerHTML = `🏷️ ${escapeHtml(tag)} <button type="button" class="tag-remove" aria-label="remove">✕</button>`;
+      chip.querySelector('.tag-remove').onclick = (e) => {
+        e.stopPropagation();
+        manualTags = manualTags.filter(x => x !== tag);
+        renderTagChips();
+      };
+      field.insertBefore(chip, input);
+    });
+  }
+  function addManualTag(raw) {
+    const tag = (raw || '').trim();
+    if (!tag || tag === 'ctv-express' || manualTags.includes(tag) || manualTags.length >= 20) return;
+    manualTags.push(tag);
+    renderTagChips();
+  }
+  function handleTagKey(event) {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
+      addManualTag(event.target.value);
+      event.target.value = '';
+    } else if (event.key === 'Backspace' && !event.target.value && manualTags.length) {
+      manualTags.pop();
+      renderTagChips();
+    }
+  }
+
   // Real-time listener for Jira automatic detection
   function handleTicketInput() {
     clearTimeout(ticketDebounceTimeout);
@@ -1790,6 +1900,7 @@
     fd.append('ticket_link', ticketInput.value);
     fd.append('country', document.getElementById('country-select').value);
     fd.append('category', document.getElementById('category-select').value);
+    fd.append('tags', manualTags.join(','));
     chosenFiles.forEach(file => {
       fd.append('videos', file);
     });
