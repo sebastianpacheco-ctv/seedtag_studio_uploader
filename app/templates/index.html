@@ -1526,6 +1526,7 @@
           activeItem.style.pointerEvents = 'auto';
           closeSSOModal();
           fetchAuthStatus();
+          loadHistory(); // el historial requiere sesión; recargar tras login (M1)
         }, 1200); // realistic mock delay for SSO redirection
       } else {
         throw new Error();
@@ -1549,6 +1550,7 @@
       isStudioConnected = false;
       document.getElementById('jwt-token').value = '';
       fetchAuthStatus();
+      loadHistory(); // limpiar el historial al cerrar sesión (M1)
     }
   }
 

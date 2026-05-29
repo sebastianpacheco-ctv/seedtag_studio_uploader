@@ -12,6 +12,7 @@ import json
 import time
 import random
 import requests
+from functools import wraps
 from pathlib import Path
 
 from flask import Flask, request, jsonify, render_template, session, Response
@@ -129,6 +130,16 @@ def safe_upload_filename(filename: str, existing_names: set[str] | None = None) 
     return candidate
 
 
+def login_required(view):
+    """Rechaza con 401 si no hay una sesión de usuario establecida (M1)."""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not session.get("user_email"):
+            return jsonify({"ok": False, "error": "No autenticado"}), 401
+        return view(*args, **kwargs)
+    return wrapper
+
+
 def _cleanup_job_dir(job_id: str) -> None:
     """Borra el directorio temporal de un job (best-effort)."""
     job_dir = TMP / job_id
@@ -191,6 +202,7 @@ def auth_status():
 
 
 @app.post("/api/set-jwt")
+@login_required
 def set_jwt():
     """Valida el JWT provisto contra Studio y lo guarda en la sesión del usuario."""
     jwt = (request.get_json(force=True, silent=True) or {}).get("jwt", "").strip()
@@ -223,6 +235,7 @@ def set_jwt():
 
 
 @app.get("/api/jira-detect/<ticket_key>")
+@login_required
 def jira_detect(ticket_key):
     """Consulta Jira en segundo plano para obtener Operator Entity e Industry."""
     key = ticket_key_from_link(ticket_key)
@@ -239,6 +252,7 @@ def jira_detect(ticket_key):
 
 
 @app.post("/api/upload")
+@login_required
 def upload():
     """Recibe N archivos + ticket link, arranca un job en background con SQLite persistence."""
     jwt = get_user_studio_jwt()
@@ -314,17 +328,26 @@ def upload():
 
 
 @app.get("/api/job/<job_id>")
+@login_required
 def job_status(job_id):
     """Consulta el estado del job y sus items desde SQLite."""
     job = database.get_job(job_id)
-    if not job:
+    # 404 también si no es del usuario actual, para no filtrar existencia (M1).
+    if not job or job.get("user_email") != session.get("user_email"):
         return jsonify({"ok": False, "error": "Job no encontrado"}), 404
     return jsonify({"ok": True, **job})
 
 
 @app.get("/api/job/<job_id>/stream")
+@login_required
 def job_status_stream(job_id):
     """Yields SSE updates in real-time when SQLite database state changes."""
+    # Verificar pertenencia antes de abrir el stream (M1).
+    viewer = session.get("user_email")
+    initial = database.get_job(job_id)
+    if not initial or initial.get("user_email") != viewer:
+        return jsonify({"ok": False, "error": "Job no encontrado"}), 404
+
     def event_generator():
         last_state = None
         # Max duration to prevent hanging connection indefinitely in dev / cloud servers
@@ -357,9 +380,10 @@ def job_status_stream(job_id):
 
 
 @app.get("/api/history")
+@login_required
 def history():
-    """Retorna la lista de uploads recientes desde SQLite."""
-    rows = database.get_history(limit=50)
+    """Retorna el historial de uploads del usuario actual desde SQLite (M1)."""
+    rows = database.get_history(limit=50, user_email=session.get("user_email"))
     return jsonify({"ok": True, "history": rows})
 
 
@@ -400,7 +424,6 @@ def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str
 
         max_attempts = 3
         jwt_expired = False
-        success = False
 
         for attempt in range(1, max_attempts + 1):
             status_text = f"uploading [Attempt {attempt}/{max_attempts}]"
@@ -420,7 +443,6 @@ def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str
 
                 preview_url = sres["preview_url"]
                 database.update_job_item(job_id, filename, status="done", url=preview_url)
-                success = True
                 break
 
             except StudioJWTExpiredError:

@@ -130,19 +130,24 @@ def get_job(job_id: str) -> dict | None:
             return job_dict
 
 
-def get_history(limit: int = 50) -> list[dict]:
-    """Retrieves all jobs and their completed stats for history display."""
+def get_history(limit: int = 50, user_email: str | None = None) -> list[dict]:
+    """Retrieves jobs and their completed stats for history display.
+
+    If user_email is given, only that user's jobs are returned (per-user history, M1)."""
+    where = "WHERE j.user_email = ?" if user_email else ""
+    params = ([user_email, limit] if user_email else [limit])
     with db_lock:
         with closing(get_db_connection()) as conn:
-            rows = conn.execute("""
-                SELECT j.*, 
+            rows = conn.execute(f"""
+                SELECT j.*,
                        (SELECT COUNT(*) FROM job_items WHERE job_id = j.job_id) as total_items,
                        (SELECT COUNT(*) FROM job_items WHERE job_id = j.job_id AND status = 'done') as success_items,
                        (SELECT COUNT(*) FROM job_items WHERE job_id = j.job_id AND status = 'error') as error_items
-                FROM jobs j 
+                FROM jobs j
+                {where}
                 ORDER BY j.created_at DESC
                 LIMIT ?
-            """, (limit,)).fetchall()
+            """, params).fetchall()
             history = []
             for row in rows:
                 d = dict(row)
