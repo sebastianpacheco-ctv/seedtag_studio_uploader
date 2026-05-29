@@ -10,6 +10,8 @@ import uuid
 import threading
 import json
 import time
+import random
+import requests
 from pathlib import Path
 
 from flask import Flask, request, jsonify, render_template, session, Response
@@ -34,6 +36,12 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-only-secret-key-12345")
 TMP = Path(os.getenv("TMP_DIR", "./tmp"))
 TMP.mkdir(parents=True, exist_ok=True)
 PROJECT_KEY = os.getenv("JIRA_PROJECT_KEY", "SDS")
+
+# Límites de subida: tamaño total del request y extensiones permitidas (A3).
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "300"))
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
+ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".webm"}
+MAX_FILES_PER_BATCH = int(os.getenv("MAX_FILES_PER_BATCH", "50"))
 
 # Initialize SQLite database schema
 database.init_db()
@@ -75,7 +83,29 @@ def safe_upload_filename(filename: str, existing_names: set[str] | None = None) 
     return candidate
 
 
+def _cleanup_job_dir(job_id: str) -> None:
+    """Borra el directorio temporal de un job (best-effort)."""
+    job_dir = TMP / job_id
+    try:
+        if job_dir.exists():
+            for child in job_dir.iterdir():
+                try:
+                    child.unlink()
+                except OSError:
+                    pass
+            job_dir.rmdir()
+    except OSError:
+        pass
+
+
 # ── Rutas ──────────────────────────────────────────────────────────────────--
+@app.errorhandler(413)
+def too_large(_e):
+    return jsonify({"ok": False,
+                    "error": f"El lote supera el máximo de {MAX_UPLOAD_MB} MB"}), 413
+
+
+
 @app.get("/")
 def index():
     return render_template("index.html")
@@ -136,10 +166,14 @@ def set_jwt():
             "email": session["studio_user_email"],
             "name": session["studio_user_name"]
         })
-    except StudioJWTExpiredError as e:
-        return jsonify({"ok": False, "error": f"El JWT ingresado está expirado: {e}"}), 401
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Error de autenticación con Studio: {str(e)}"}), 400
+    except StudioJWTExpiredError:
+        return jsonify({"ok": False, "error": "El JWT ingresado está expirado. Renuévalo en Studio."}), 401
+    except requests.exceptions.RequestException:
+        # Studio inalcanzable: no es culpa del JWT (M6).
+        return jsonify({"ok": False, "error": "Studio no está disponible en este momento. Intentá de nuevo."}), 502
+    except Exception:
+        # No reflejar el detalle de la excepción al cliente (A2).
+        return jsonify({"ok": False, "error": "No se pudo verificar el JWT con Studio."}), 400
 
 
 @app.get("/api/jira-detect/<ticket_key>")
@@ -173,8 +207,21 @@ def upload():
                         "error": f"Link de ticket inválido o fuera del proyecto {PROJECT_KEY} (SDS-XXXX)"}), 400
 
     files = request.files.getlist("videos")
-    if not files or len(files) == 0 or (len(files) == 1 and files[0].filename == ''):
+    files = [f for f in files if f and f.filename]
+    if not files:
         return jsonify({"ok": False, "error": "No se seleccionaron archivos de video"}), 400
+
+    if len(files) > MAX_FILES_PER_BATCH:
+        return jsonify({"ok": False,
+                        "error": f"Demasiados archivos en el lote (máx {MAX_FILES_PER_BATCH})"}), 400
+
+    # Validar extensión server-side (el accept del HTML es solo cosmético).
+    for f in files:
+        ext = Path(f.filename).suffix.lower()
+        if ext not in ALLOWED_VIDEO_EXTS:
+            allowed = ", ".join(sorted(ALLOWED_VIDEO_EXTS))
+            return jsonify({"ok": False,
+                            "error": f"Formato no admitido en '{f.filename}'. Permitidos: {allowed}"}), 400
 
     # Obtener parámetros de País y Categoría
     country = request.form.get("country", "auto")
@@ -191,12 +238,18 @@ def upload():
     database.create_job(job_id, ticket_key, user_email, status="running")
 
     # Guardar cada archivo y agregarlo a job_items con nombres seguros y únicos.
-    used_filenames = set()
-    for f in files:
-        filename = safe_upload_filename(f.filename, used_filenames)
-        dest = job_dir / filename
-        f.save(str(dest))
-        database.add_job_item(job_id, filename, str(dest), status="queued")
+    # Si algo falla al guardar, limpiar el directorio para no dejar temp files huérfanos.
+    try:
+        used_filenames = set()
+        for f in files:
+            filename = safe_upload_filename(f.filename, used_filenames)
+            dest = job_dir / filename
+            f.save(str(dest))
+            database.add_job_item(job_id, filename, str(dest), status="queued")
+    except Exception:
+        _cleanup_job_dir(job_id)
+        database.update_job_status(job_id, status="error", done=True)
+        raise
 
     # Arrancar hilo worker en background
     t = threading.Thread(
@@ -304,10 +357,6 @@ def _run_job(job_id: str, jwt: str, ticket_key: str, country: str, category: str
         success = False
 
         for attempt in range(1, max_attempts + 1):
-            import time
-            import random
-            import requests
-
             status_text = f"uploading [Attempt {attempt}/{max_attempts}]"
             database.update_job_item(job_id, filename, status=status_text)
 
@@ -412,5 +461,5 @@ if __name__ == "__main__":
     # Escuchar en 0.0.0.0 para contenedores y adaptarse al puerto dinámico de Cloud Run (PORT)
     host = os.getenv("APP_HOST", "127.0.0.1")
     port = int(os.getenv("PORT", os.getenv("APP_PORT", "8088")))
-    debug_mode = os.getenv("FLASK_DEBUG", "True").lower() == "true"
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
     app.run(host=host, port=port, debug=debug_mode)
