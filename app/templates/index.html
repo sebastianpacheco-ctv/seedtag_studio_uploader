@@ -792,6 +792,21 @@
       padding: 2px 0;
     }
 
+    .ticket-summary {
+      margin-top: 6px;
+      font-size: 0.82rem;
+      color: var(--grey-2);
+      font-weight: 400;
+    }
+
+    .file-name-warn {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #f59e0b;
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+
     /* History / Past Uploads Section */
     .history-table-wrapper {
       overflow-x: auto;
@@ -1283,6 +1298,8 @@
   let isStudioConnected = false;
   let activeEventSource = null;
   let ticketDebounceTimeout = null;
+  let detectedSummary = '';
+  let detectedKey = '';
   // localStorage puede lanzar en modo privado / con storage bloqueado; nunca dejar
   // que rompa la carga del script (A7).
   function safeStorageGet(key) {
@@ -1377,6 +1394,8 @@
       backendNetworkError: 'Error de red al conectar al backend',
       detectingTicket: 'Detectando campos del ticket',
       detectedInJira: 'Detectado en Jira',
+      nameMismatch: 'no coincide con el ticket',
+      nameMismatchTip: 'El nombre del archivo no parece relacionarse con el ticket. Revisá que sea el video correcto.',
       noJiraFields: 'Sin campos configurados en Jira. Se aplicarán valores por defecto.',
       jiraUnavailable: 'Jira no disponible o ticket inaccesible. Ingresa país/categoría manualmente.',
       jiraLoginNeeded: 'Iniciá sesión con Google para auto-detectar desde Jira.',
@@ -1480,6 +1499,8 @@
       backendNetworkError: 'Network error while connecting to the backend',
       detectingTicket: 'Detecting fields for ticket',
       detectedInJira: 'Detected in Jira',
+      nameMismatch: "doesn't match the ticket",
+      nameMismatchTip: "The file name doesn't seem related to the ticket. Check it's the right video.",
       noJiraFields: 'No Jira fields configured. Default values will be applied.',
       jiraUnavailable: 'Jira unavailable or ticket inaccessible. Enter country/category manually.',
       jiraLoginNeeded: 'Sign in with Google to auto-detect from Jira.',
@@ -1624,16 +1645,43 @@
   }
 
   // Update file queue lists
+  // Tokens significativos (>=3 chars) de un texto, normalizados.
+  function nameTokens(text) {
+    return (text || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '') // sin acentos
+      .split(/[^a-z0-9]+/)
+      .filter(tok => tok.length >= 3);
+  }
+
+  // ¿El nombre del archivo se relaciona con el ticket? (key o tokens del summary) (#4)
+  function nameMatchesTicket(filename) {
+    if (!detectedKey && !detectedSummary) return true; // sin ticket detectado, no opinamos
+    const fileToks = new Set(nameTokens(filename));
+    if (detectedKey) {
+      const num = detectedKey.split('-')[1];
+      if (num && filename.toLowerCase().includes(num)) return true;
+      if (filename.toLowerCase().includes(detectedKey.toLowerCase())) return true;
+    }
+    const summaryToks = nameTokens(detectedSummary);
+    return summaryToks.some(tok => fileToks.has(tok));
+  }
+
   function updateFileList() {
     fileListElement.innerHTML = '';
     chosenFiles.forEach((file, index) => {
       const safeName = escapeHtml(file.name);
+      const mismatch = !nameMatchesTicket(file.name);
+      const warn = mismatch
+        ? `<div class="file-name-warn" title="${escapeHtml(t('nameMismatchTip'))}">⚠️ ${escapeHtml(t('nameMismatch'))}</div>`
+        : '';
       const fileItem = document.createElement('div');
       fileItem.className = 'file-item';
       fileItem.innerHTML = `
         <div class="file-name">
           <span>🎬</span>
           <span title="${safeName}">${safeName}</span>
+          ${warn}
         </div>
         <div class="file-size">${formatBytes(file.size)}</div>
       `;
@@ -1870,20 +1918,28 @@
         }
 
         if (j.ok) {
+          // Guardar para el chequeo nombre-video vs ticket (#4).
+          detectedSummary = j.summary || '';
+          detectedKey = j.key || key;
           let badgeText = '';
           if (j.country || j.category) {
             badgeText = `✨ ${escapeHtml(t('detectedInJira'))}: `;
             if (j.country) badgeText += `🌍 ${escapeHtml(j.country)} `;
             if (j.category) badgeText += `🏷️ ${escapeHtml(j.category)}`;
-            
+
             // Set selectors to auto by default
             document.getElementById('country-select').value = 'auto';
             document.getElementById('category-select').value = 'auto';
           } else {
             badgeText = `⚠️ ${escapeHtml(t('noJiraFields'))}`;
           }
+          if (detectedSummary) {
+            badgeText += `<div class="ticket-summary">📄 ${escapeHtml(detectedSummary)}</div>`;
+          }
           badgeContainer.innerHTML = `<div class="detection-badge">${badgeText}</div>`;
+          updateFileList(); // re-evaluar match de nombres con el ticket
         } else {
+          detectedSummary = ''; detectedKey = '';
           badgeContainer.innerHTML = `<div class="detection-badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239,68,68,0.2)">⚠️ ${escapeHtml(t('jiraUnavailable'))}</div>`;
         }
       } catch (err) {

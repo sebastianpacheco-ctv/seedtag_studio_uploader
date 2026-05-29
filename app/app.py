@@ -307,7 +307,9 @@ def jira_detect(ticket_key):
     return jsonify({
         "ok": True,
         "country": fields.get("country"),
-        "category": fields.get("category")
+        "category": fields.get("category"),
+        "summary": fields.get("summary"),
+        "key": key
     })
 
 

@@ -27,18 +27,19 @@ class JiraClient:
 
     def get_issue_fields(self, ticket_key: str) -> dict:
         """
-        Fetches custom fields for Operator Entity and Industry.
+        Fetches the ticket summary plus custom fields for Operator Entity and Industry.
+        Summary: campo `summary`
         Operator Entity (Country): customfield_14324
         Industry (Category): customfield_15831
         """
         if not self.enabled:
             log.info("Jira Client: disabled. Skipping field retrieval.")
-            return {"country": None, "category": None}
+            return {"country": None, "category": None, "summary": None}
 
         # Security check: only SDS issues (or whatever JIRA_PROJECT_KEY is)
         if not ticket_key.startswith(self.project_key + "-"):
             log.warning(f"Jira Client: ticket {ticket_key} is not from project {self.project_key}. Rejecting.")
-            return {"country": None, "category": None}
+            return {"country": None, "category": None, "summary": None}
 
         url = f"{self.base_url}/rest/api/2/issue/{ticket_key}"
         try:
@@ -50,13 +51,14 @@ class JiraClient:
             )
             if r.status_code == 404:
                 log.warning(f"Jira Client: ticket {ticket_key} not found.")
-                return {"country": None, "category": None}
+                return {"country": None, "category": None, "summary": None}
             if r.status_code != 200:
-                log.error(f"Jira Client: failed to fetch ticket {ticket_key} (HTTP {r.status_code}): {r.text[:300]}")
-                return {"country": None, "category": None}
+                log.error(f"Jira Client: failed to fetch ticket {ticket_key} (HTTP {r.status_code})")
+                return {"country": None, "category": None, "summary": None}
 
             issue = r.json()
             fields = issue.get("fields", {})
+            summary_val = fields.get("summary")
 
             # Parse customfield_14324 (Operator Entity/Country)
             raw_country = fields.get("customfield_14324")
@@ -75,11 +77,11 @@ class JiraClient:
                 category_val = raw_category
 
             log.info(f"Jira Client: fetched metadata for {ticket_key} — country={country_val}, category={category_val}")
-            return {"country": country_val, "category": category_val}
+            return {"country": country_val, "category": category_val, "summary": summary_val}
 
         except Exception as e:
             log.exception(f"Jira Client: exception fetching {ticket_key}: {e}")
-            return {"country": None, "category": None}
+            return {"country": None, "category": None, "summary": None}
 
     def add_comment(self, ticket_key: str, comment_text: str) -> bool:
         """
