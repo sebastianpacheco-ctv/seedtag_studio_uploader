@@ -99,11 +99,29 @@ Actualmente, el despliegue a producción se encuentra en pausa debido a:
 
 ---
 
+## 🔐 Seguridad & Auth (estado actual)
+
+Se corrió una auditoría completa (ver **[AUDIT.md](AUDIT.md)**) y se aplicaron los tres tiers:
+
+- **SSO real (Google OIDC)**: rutas `/auth/login` y `/auth/callback` con Authlib. Se activa
+  cuando hay `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`; exige correo verificado del dominio
+  `ALLOWED_EMAIL_DOMAIN` (default `seedtag.com`). Sin esas creds y en dev (`FLASK_DEBUG=True`)
+  sigue el login simulado; en prod sin OIDC el login está deshabilitado.
+- **Secret fail-closed**: `FLASK_SECRET_KEY` es obligatoria en prod (la app no arranca sin ella).
+- **Cookies endurecidas** (`HttpOnly`/`SameSite=Lax`/`Secure`) y **CSRF** vía header
+  `X-Requested-With` exigido en los POST.
+- **Endpoints de datos con `@login_required`** y filtro por usuario en history/jobs.
+- **JWT de Studio por usuario** (el fallback por env solo si `ALLOW_ENV_STUDIO_JWT=True`).
+
+**Para activar OIDC en producción:** crear un OAuth Client ID (Web) en Google Cloud Console,
+setear las env vars y registrar el redirect URI `https://<URL-publica>/auth/callback`.
+
 ## 🔮 Sugerencias para el Siguiente Modelo de IA
 
 Si vas a continuar expandiendo esta aplicación, aquí tienes excelentes puntos de partida:
-1. **SSO Real**: Integrar Firebase Auth de forma real con Google Workspace SSO una vez que la facturación de Firebase esté lista.
-2. **Reintentos Dinámicos en Backend**: Aumentar la resiliencia en `_run_job` para pausar y reanudar subidas de videos pesados en caso de inestabilidad de red.
-3. **Manejo de Roles**: Restringir ciertas operaciones de subida basándose en el email del SSO.
+1. **SSE → polling client-side** (hallazgo A5 de la auditoría, aún pendiente): el stream SSE
+   retiene un thread y polea SQLite cada 1s; conviene mover a polling de `/api/job/<id>`.
+2. **Reintentos Dinámicos en Backend**: pausar/reanudar subidas pesadas ante inestabilidad de red.
+3. **Manejo de Roles**: restringir operaciones según el email del SSO.
 
 ¡Buena suerte programando! 🚀
